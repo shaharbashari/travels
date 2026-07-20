@@ -16,8 +16,10 @@ export function getRoute() {
 
   if (parts[0] === 't' && parts[1]) {
     const tourId = parts[1];
-    let tab = parts[2] || 'home';
-    if (!TABS.includes(tab)) tab = 'home';
+    const seg = parts[2] || 'home';
+    // עמוד פרטי מקום: #/t/<id>/place/<placeId>
+    if (seg === 'place') return { name: 'tour', tourId, tab: 'place', param: parts[3] || null };
+    let tab = TABS.includes(seg) ? seg : 'home';
     const param = parts[3] || null;
     return { name: 'tour', tourId, tab, param };
   }

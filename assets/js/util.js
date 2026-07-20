@@ -67,6 +67,9 @@ export const CATEGORIES = {
   restaurants: { he: 'מסעדות', emoji: '🍽️', color: 'var(--c-restaurants)' },
   sweets: { he: 'מתוקים ובתי קפה', emoji: '🍰', color: 'var(--c-sweets)' },
   baths: { he: 'מרחצאות תרמיים', emoji: '🧖', color: 'var(--c-baths)' },
+  museums: { he: 'מוזיאונים וגלריות', emoji: '🖼️', color: 'var(--c-museums)' },
+  views: { he: 'נקודות תצפית', emoji: '🌄', color: 'var(--c-views)' },
+  parks: { he: 'פארקים וטבע', emoji: '🌳', color: 'var(--c-parks)' },
   shopping: { he: 'שופינג', emoji: '🛍️', color: 'var(--c-shopping)' },
   nightlife: { he: 'בילוי וברים', emoji: '🍹', color: 'var(--c-nightlife)' },
 };
@@ -93,6 +96,41 @@ export function fromHTML(html) {
   const t = document.createElement('template');
   t.innerHTML = html.trim();
   return t.content.firstElementChild;
+}
+
+/** מזהה יציב וקצר מתוך מחרוזת (לשימוש כ-id של מקום ב-URL). */
+export function pid(s) {
+  s = String(s || '');
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return 'p' + h.toString(36);
+}
+
+/** slug באנגלית (למזהי טיולים חדשים). */
+export function slugify(s) {
+  return String(s || '')
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    .slice(0, 48) || ('trip-' + Date.now().toString(36));
+}
+
+/** בחירת אימוג׳י אוטומטית לפי שם/קטגוריה (לגרפיקה אוטומטית בטופס ההוספה). */
+const ICON_HINTS = [
+  [/museum|גלרי|מוזיא/i, '🖼️'], [/bath|spa|thermal|מרחצ|ספא/i, '🧖'],
+  [/church|basilica|cathedral|כנסיי|בזיליק/i, '⛪'], [/synagog|בית כנסת|בית הכנסת/i, '🕍'],
+  [/bridge|גשר/i, '🌉'], [/castle|palace|טירה|מצוד|ארמון/i, '🏰'],
+  [/market|שוק/i, '🏬'], [/park|garden|פארק|גן |טבע/i, '🌳'],
+  [/view|lookout|panorama|תצפית|נוף/i, '🌄'], [/island|אי /i, '🏝️'],
+  [/coffee|cafe|café|קפה/i, '☕'], [/cake|dessert|sweet|עוגה|מתוק|קינוח/i, '🍰'],
+  [/bar|pub|ruin|בר |פאב/i, '🍸'], [/burger|המבורגר/i, '🍔'],
+  [/wine|יין/i, '🍷'], [/shop|mall|קניון|חנות|שופינג/i, '🛍️'],
+  [/opera|theat|תיאטרון|אופרה/i, '🎭'], [/square|כיכר/i, '🗽'],
+  [/river|cruise|boat|שיט|נהר|סירה/i, '🚢'], [/restaurant|מסעד|ביסטרו/i, '🍽️'],
+];
+export function iconFor(name, category) {
+  const s = String(name || '');
+  for (const [re, emo] of ICON_HINTS) if (re.test(s)) return emo;
+  return (CATEGORIES[category] && CATEGORIES[category].emoji) || '📍';
 }
 
 /** אנימציית ספירה למספר. */

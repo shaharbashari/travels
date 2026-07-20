@@ -136,6 +136,13 @@ export function render({ tour }) {
       </div>
     `) : ''}
 
+    ${(tour.extraInfo || []).map((sec) => section(sec.title, sec.emoji || '📌', `
+      <div class="info-card">
+        ${sec.body ? `<p class="section-sub" style="margin-top:0">${esc(sec.body)}</p>` : ''}
+        ${(sec.items || []).map((it) => `<div class="trans-item"><div class="trans-item__h">${esc(it.h || it.name || '')}</div>${(it.d || it.desc) ? `<div class="trans-item__d">${esc(it.d || it.desc)}</div>` : ''}</div>`).join('')}
+      </div>
+    `)).join('')}
+
     ${(tour.photoCredits || []).length ? section('קרדיטים לצילומים', '📷', `
       <div class="info-card">
         <p class="section-sub" style="margin-top:0">כל התמונות מ־Wikimedia Commons, ברישיון חופשי (CC / נחלת הכלל).</p>
