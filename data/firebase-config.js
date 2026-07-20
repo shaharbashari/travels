@@ -15,12 +15,13 @@
 // ============================================================================
 
 export const firebaseConfig = {
-  apiKey: 'YOUR_API_KEY',
-  authDomain: 'YOUR_PROJECT.firebaseapp.com',
-  projectId: 'YOUR_PROJECT_ID',
-  storageBucket: 'YOUR_PROJECT.appspot.com',
-  messagingSenderId: 'YOUR_SENDER_ID',
-  appId: 'YOUR_APP_ID',
+  apiKey: 'AIzaSyBsjU_9hEeH8c2bMPJzXwDRwJxoc2NeFZk',
+  authDomain: 'hadar-travels.firebaseapp.com',
+  projectId: 'hadar-travels',
+  storageBucket: 'hadar-travels.firebasestorage.app',
+  messagingSenderId: '367571481203',
+  appId: '1:367571481203:web:91dd20d27fa293d5003006',
+  measurementId: 'G-V7XD522EB0',
 };
 
 export default firebaseConfig;
