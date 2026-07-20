@@ -25,6 +25,14 @@
 | `packing?` | `PackBox[]` | | רשימות אריזה לפי קטגוריה. |
 | `transport?` | `TransportSection[]` | | מדריך תחבורה. |
 | `transportTips?` | string[] | | טיפים לתחבורה. |
+| `hero?` | string | | כתובת תמונת נושא (URL) — רקע ה-hero ובכרטיס הטיול. |
+| `money?` | `{currency, rate?, cards?, tipping?, notes?}` | | כספים ומטבע. |
+| `connectivity?` | string[] | | טיפים לתקשורת/אינטרנט. |
+| `budget?` | `{label, value}[]` | | תקציב יומי משוער. |
+| `emergency?` | `{label, value}[]` | | טלפוני חירום. |
+| `apps?` | `{name, desc?}[]` | | אפליקציות שימושיות. |
+| `beforeYouGo?` | string[] | | צ׳קליסט לפני הנסיעה. |
+| `photoCredits?` | `{t, by, lic, src}[]` | | קרדיטים לתמונות (חובה ל-CC-BY/CC-BY-SA). |
 | `phrasebook?` | `Phrase[]` | | שיחון. |
 | `days` | `Day[]` | ✅ | המסלול היומי. |
 | `places?` | `Place[]` | | מקומות ל"מה עושים" ולמפה. |
@@ -80,8 +88,11 @@
 
 ### Place
 ```
-{ name, he?, category, emoji?, day?, desc?, badge?, lat?, lng? }
+{ name, he?, category, emoji?, day?, desc?, badge?,
+  img?, hours?, price?, tip?, lat?, lng? }
 ```
-`category` ∈ `attractions` · `restaurants` · `shopping` · `sweets` · `nightlife`
+`category` ∈ `attractions` · `restaurants` · `sweets` · `baths` · `shopping` · `nightlife`
 (מוגדר ב-`assets/js/util.js` → `CATEGORIES`; שם אפשר להוסיף קטגוריות חדשות).
+`img` — כתובת תמונה (URL). מוצגת בכרטיס המקום, בציר הזמן ובחלון המפה; אם חסרה/נכשלת מוצג אימוג׳י.
+`hours` / `price` / `tip` — שעות פתיחה, מחיר וטיפ (מוצגים כצ׳יפים/הערה).
 אם קיימים `lat`/`lng` — המקום מופיע על המפה.

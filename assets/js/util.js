@@ -65,13 +65,28 @@ export const STATUS_LABELS = {
 export const CATEGORIES = {
   attractions: { he: 'אתרים ומקומות', emoji: '🏛️', color: 'var(--c-attractions)' },
   restaurants: { he: 'מסעדות', emoji: '🍽️', color: 'var(--c-restaurants)' },
-  shopping: { he: 'שופינג', emoji: '🛍️', color: 'var(--c-shopping)' },
   sweets: { he: 'מתוקים ובתי קפה', emoji: '🍰', color: 'var(--c-sweets)' },
-  nightlife: { he: 'בילוי', emoji: '🍹', color: 'var(--c-nightlife)' },
+  baths: { he: 'מרחצאות תרמיים', emoji: '🧖', color: 'var(--c-baths)' },
+  shopping: { he: 'שופינג', emoji: '🛍️', color: 'var(--c-shopping)' },
+  nightlife: { he: 'בילוי וברים', emoji: '🍹', color: 'var(--c-nightlife)' },
 };
 
-/** צבע לפי אינדקס (לנקודות מסע / פינים). */
-export const PALETTE = ['#c8102e', '#1f6f8b', '#d9a441', '#7d5a8c', '#7c9a6f', '#4e5d94', '#d5604b'];
+/** צבע לפי אינדקס (לנקודות מסע / פינים) — פלטה בהירה. */
+export const PALETTE = ['#ff4d67', '#2aa6e8', '#ffc233', '#7b5ce0', '#23c98a', '#ff8a3d', '#12c2b3'];
+
+/**
+ * תמונה ממוזערת עם נפילה חיננית לאימוג׳י אם אין תמונה / התמונה נכשלת.
+ * @param {string} [img]   כתובת תמונה
+ * @param {string} [emoji] אימוג׳י נפילה
+ * @param {{cls?:string,color?:string}} [o]
+ */
+export function thumb(img, emoji, o = {}) {
+  const style = o.color ? ` style="--c:${o.color}"` : '';
+  const im = img
+    ? `<img src="${esc(img)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onload="this.classList.add('is-loaded')" onerror="this.remove()">`
+    : '';
+  return `<div class="thumb ${o.cls || ''}"${style}><span class="thumb__em">${esc(emoji || '📍')}</span>${im}</div>`;
+}
 
 /** צור אלמנט מ-HTML string. */
 export function fromHTML(html) {

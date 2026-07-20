@@ -1,7 +1,7 @@
 // ============================================================================
 //  views/days.js — מסלול יומי כציר זמן
 // ============================================================================
-import { esc, fmtWeekday, fmtDateShort } from '../util.js';
+import { esc, fmtWeekday, fmtDateShort, thumb } from '../util.js';
 
 function placeLookup(tour) {
   const map = new Map();
@@ -24,9 +24,12 @@ function timelineItem(tour, item, isLast, places) {
         ${isLast ? '' : '<div class="tl-line"></div>'}
       </div>
       <div class="tl-card">
-        <div class="tl-card__title">${esc(item.title)}</div>
-        ${item.desc ? `<div class="tl-card__desc">${esc(item.desc)}</div>` : ''}
-        ${placeLink ? `<div class="tl-card__place">${placeLink}</div>` : ''}
+        <div class="tl-card__body">
+          <div class="tl-card__title">${esc(item.title)}</div>
+          ${item.desc ? `<div class="tl-card__desc">${esc(item.desc)}</div>` : ''}
+          ${placeLink ? `<div class="tl-card__place">${placeLink}</div>` : ''}
+        </div>
+        ${item.img || (place && place.img) ? thumb(item.img || place.img, item.emoji, { color: 'var(--gold)' }) : ''}
       </div>
     </div>`;
 }

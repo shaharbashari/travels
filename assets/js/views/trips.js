@@ -24,6 +24,7 @@ function tripCard(tour) {
   <a class="trip-card" href="#/t/${encodeURIComponent(tour.id)}/home" aria-label="${esc(tour.title)}">
     <div class="trip-card__cover">
       ${skyline({ reflection: true })}
+      ${tour.hero ? `<img class="cover-photo" src="${esc(tour.hero)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onload="this.classList.add('is-loaded')" onerror="this.remove()">` : ''}
       <span class="trip-card__flag flag">${esc(tour.destination?.flag || '📍')}</span>
       <span class="trip-card__status"><span class="badge ${s.cls}">${esc(s.he)}</span></span>
     </div>

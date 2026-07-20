@@ -23,6 +23,7 @@
  * @property {string[]} [travelers]     שמות הנוסעים
  * @property {{accent?:string,accent2?:string,gold?:string}} [theme]
  * @property {string} [emoji]
+ * @property {string} [hero]            כתובת תמונת נושא (URL) — מוצגת ברקע ה-hero ובכרטיס הטיול
  * @property {string} [summary]
  * @property {Flight[]} [flights]
  * @property {{name:string,note?:string}} [transfer]
@@ -31,6 +32,13 @@
  * @property {PackBox[]} [packing]
  * @property {TransportSection[]} [transport]
  * @property {string[]} [transportTips]
+ * @property {{currency:string,rate?:string,cards?:string,tipping?:string,notes?:string[]}} [money]
+ * @property {string[]} [connectivity]  טיפים לתקשורת/אינטרנט
+ * @property {{label:string,value:string}[]} [budget]     תקציב משוער ליום
+ * @property {{label:string,value:string}[]} [emergency]  טלפוני חירום
+ * @property {{name:string,desc?:string}[]} [apps]        אפליקציות שימושיות
+ * @property {string[]} [beforeYouGo]   צ׳קליסט לפני הנסיעה
+ * @property {{t:string,by:string,lic:string,src:string}[]} [photoCredits]  קרדיטים לתמונות
  * @property {Phrase[]} [phrasebook]
  * @property {Day[]} days
  * @property {Place[]} [places]
@@ -50,6 +58,7 @@ const tourTemplate = {
 
   theme: { accent: '#c8102e', accent2: '#1f6f8b', gold: '#d9a441' },
   emoji: '📍',
+  hero: 'https://upload.wikimedia.org/.../photo.jpg', // תמונת נושא (URL). מומלץ Wikimedia Commons ברישיון חופשי
   summary: 'פסקה קצרה שמתארת את הטיול.',
 
   // ---- טיסות (0 או יותר) --------------------------------------------------
@@ -96,6 +105,33 @@ const tourTemplate = {
   ],
   transportTips: ['טיפ 1', 'טיפ 2'],
 
+  // ---- מידע פרקטי (הכול אופציונלי) ---------------------------------------
+  money: {
+    currency: 'שם המטבע · CODE',
+    rate: '100 CODE ≈ 00 ₪',
+    cards: 'משפט על תשלום בכרטיסי אשראי.',
+    tipping: 'משפט על טיפים.',
+    notes: ['הערה על מזומן/כספומטים'],
+  },
+  connectivity: ['eSIM/סים', 'Wi-Fi', 'אפליקציות מפה'],
+  budget: [
+    { label: 'ארוחות', value: '00–00 ₪' },
+    { label: 'תחבורה', value: '00 ₪' },
+  ],
+  emergency: [
+    { label: 'חירום כללי', value: '112' },
+    { label: 'שגרירות ישראל', value: '+00-0-000-0000' },
+  ],
+  apps: [
+    { name: 'שם האפליקציה', desc: 'למה היא שימושית.' },
+  ],
+  beforeYouGo: ['להזמין X מראש', 'להתקין eSIM', 'לבדוק תוקף דרכון'],
+
+  // קרדיטים לתמונות (חובה אם משתמשים בתמונות ברישיון CC-BY / CC-BY-SA)
+  photoCredits: [
+    { t: 'שם/נושא', by: 'שם הצלם', lic: 'CC BY 4.0', src: 'https://commons.wikimedia.org/wiki/File:...' },
+  ],
+
   // ---- שיחון --------------------------------------------------------------
   phrasebook: [
     { he: 'תודה', local: 'Thanks', translit: 'תַנקְס' },
@@ -116,10 +152,11 @@ const tourTemplate = {
   ],
 
   // ---- מה עושים (מקומות) --------------------------------------------------
-  // category: 'attractions' | 'restaurants' | 'shopping' | 'sweets' | 'nightlife'
+  // category: 'attractions' | 'restaurants' | 'sweets' | 'baths' | 'shopping' | 'nightlife'
+  // שדות אופציונליים: img (URL תמונה), hours, price, tip, badge, lat, lng
   places: [
     { name: 'שם המקום', he: '', category: 'attractions', emoji: '📍', day: 1,
-      desc: 'תיאור קצר', badge: '', lat: 0, lng: 0 },
+      desc: 'תיאור קצר', img: '', hours: '', price: '', tip: '', badge: '', lat: 0, lng: 0 },
   ],
 };
 

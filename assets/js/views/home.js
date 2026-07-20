@@ -1,7 +1,7 @@
 // ============================================================================
 //  views/home.js — עמוד הבית של הטיול: ספירה לאחור, מסע, כרטיסים מהירים
 // ============================================================================
-import { esc, fmtRange, fmtDateShort, daysUntil, nights, countUp, PALETTE, CATEGORIES } from '../util.js';
+import { esc, fmtRange, fmtDateShort, daysUntil, nights, countUp, PALETTE, CATEGORIES, thumb } from '../util.js';
 import { skyline } from '../svg.js';
 
 function countdownBlock(tour, status) {
@@ -43,15 +43,15 @@ function flightCard(f) {
 }
 
 function highlights(tour) {
-  const picks = tour.places.filter((p) => p.badge).slice(0, 6);
+  const picks = tour.places.filter((p) => p.badge).slice(0, 8);
   if (!picks.length) return '';
   return `
     <h2 class="section-title"><span class="em">⭐</span> רגעים לא לפספס</h2>
     <div class="filter-chips" style="gap:14px">
       ${picks.map((p) => {
         const c = CATEGORIES[p.category] || {};
-        return `<a class="place-card washi" style="--wc:${c.color};min-width:250px;flex:0 0 auto" href="#/t/${encodeURIComponent(tour.id)}/explore/${p.category}">
-          <div class="place-card__em">${esc(p.emoji || c.emoji)}</div>
+        return `<a class="place-card washi" style="--wc:${c.color};min-width:260px;flex:0 0 auto" href="#/t/${encodeURIComponent(tour.id)}/explore/${p.category}">
+          ${thumb(p.img, p.emoji || c.emoji, { color: c.color })}
           <div>
             <div class="place-card__name">${esc(p.name)}</div>
             <div class="place-card__desc">${esc(p.desc || '')}</div>
@@ -71,6 +71,8 @@ export function render({ tour, status }) {
   return `
     <section class="hero">
       ${skyline({ reflection: true })}
+      ${tour.hero ? `<img class="hero__photo" src="${esc(tour.hero)}" alt="" decoding="async" referrerpolicy="no-referrer" onload="this.classList.add('is-loaded')" onerror="this.remove()">` : ''}
+      <div class="hero__scrim"></div>
       <div class="hero__inner">
         <div class="hero__eyebrow">${esc(tour.destination?.country || '')} · ${esc(fmtRange(tour.dates?.start, tour.dates?.end))}</div>
         <h1 class="hero__title">${esc(tour.title)}</h1>

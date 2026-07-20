@@ -17,7 +17,7 @@ function points(tour) {
     if (p.lat && p.lng) {
       const c = CATEGORIES[p.category] || {};
       pts.push({ name: p.name, lat: p.lat, lng: p.lng, emoji: p.emoji || c.emoji,
-        color: c.color, catLabel: c.he, desc: p.desc });
+        color: c.color, catLabel: c.he, desc: p.desc, img: p.img });
     }
   });
   return pts;
@@ -59,7 +59,8 @@ export function mount({ tour }, root) {
     const html = `<div class="map-pin" style="background:${p.color}"><span>${p.hotel ? '🏨' : i}</span></div>`;
     const icon = L.divIcon({ html, className: '', iconSize: [30, 30], iconAnchor: [15, 28], popupAnchor: [0, -28] });
     const m = L.marker([p.lat, p.lng], { icon }).addTo(map);
-    m.bindPopup(`<div style="text-align:right;direction:rtl;min-width:150px">
+    m.bindPopup(`<div style="text-align:right;direction:rtl;min-width:170px">
+        ${p.img ? `<img src="${esc(p.img)}" alt="" referrerpolicy="no-referrer" style="width:100%;height:96px;object-fit:cover;border-radius:12px;margin-bottom:8px" onerror="this.remove()">` : ''}
         <strong>${esc(p.name)}</strong><br>
         <span style="color:#6c6156;font-size:.85em">${esc(p.catLabel || '')}</span>
         ${p.desc ? `<br><span style="font-size:.85em">${esc(p.desc)}</span>` : ''}

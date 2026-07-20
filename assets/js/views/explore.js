@@ -1,7 +1,7 @@
 // ============================================================================
 //  views/explore.js — קטגוריות ומקומות ("מה עושים")
 // ============================================================================
-import { esc, CATEGORIES } from '../util.js';
+import { esc, CATEGORIES, thumb } from '../util.js';
 
 const gmaps = (name) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ', Budapest')}`;
@@ -40,15 +40,18 @@ function placeCard(tour, p) {
   const sub = p.he && p.he.trim();
   return `
     <div class="place-card washi" style="--wc:${c.color}">
-      <div class="place-card__em">${esc(p.emoji || c.emoji)}</div>
+      ${thumb(p.img, p.emoji || c.emoji, { color: c.color })}
       <div>
         <div class="place-card__name">${esc(p.name)} ${sub ? `<span class="lat">${esc(p.he)}</span>` : ''}</div>
         ${p.desc ? `<div class="place-card__desc">${esc(p.desc)}</div>` : ''}
         <div class="place-card__foot">
           ${p.badge ? `<span class="badge" style="background:color-mix(in srgb, ${c.color} 14%, #fff);color:${c.color};border-color:color-mix(in srgb, ${c.color} 30%, #fff)">${esc(p.badge)}</span>` : ''}
+          ${p.hours ? `<span class="chip" style="padding:4px 11px;font-size:.78rem">🕒 ${esc(p.hours)}</span>` : ''}
+          ${p.price ? `<span class="chip" style="padding:4px 11px;font-size:.78rem">💰 ${esc(p.price)}</span>` : ''}
           ${p.day ? `<span class="chip" style="padding:4px 11px;font-size:.78rem">יום ${p.day}</span>` : ''}
           <a class="place-link" href="${gmaps(p.name)}" target="_blank" rel="noopener">🗺️ במפות</a>
         </div>
+        ${p.tip ? `<div class="place-tip">💡 ${esc(p.tip)}</div>` : ''}
       </div>
       <span class="place-card__cat" style="background:${c.color}"></span>
     </div>`;

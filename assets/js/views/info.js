@@ -89,6 +89,43 @@ export function render({ tour }) {
       </div>` : ''}
     `)}
 
+    ${tour.money ? section('כספים ומטבע', '💳', `
+      <div class="info-card">
+        <div class="kv"><span class="k">מטבע</span><span class="v">${esc(tour.money.currency || '')}</span></div>
+        ${tour.money.rate ? `<div class="kv"><span class="k">שער חליפין</span><span class="v" style="font-family:var(--font-latin)">${esc(tour.money.rate)}</span></div>` : ''}
+        ${tour.money.cards ? `<div class="kv"><span class="k">אשראי</span><span class="v" style="max-width:62%">${esc(tour.money.cards)}</span></div>` : ''}
+        ${tour.money.tipping ? `<div class="kv"><span class="k">טיפים</span><span class="v" style="max-width:62%">${esc(tour.money.tipping)}</span></div>` : ''}
+        ${(tour.money.notes || []).length ? `<ul class="tips" style="margin-top:10px">${tour.money.notes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
+      </div>
+    `) : ''}
+
+    ${(tour.connectivity || []).length ? section('תקשורת ואינטרנט', '📶', `
+      <div class="info-card"><ul class="tips">${tour.connectivity.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>
+    `) : ''}
+
+    ${(tour.budget || []).length ? section('תקציב משוער ליום', '🧮', `
+      <div class="info-card">
+        ${tour.budget.map((b) => `<div class="kv"><span class="k">${esc(b.label)}</span><span class="v" style="font-family:var(--font-latin)">${esc(b.value)}</span></div>`).join('')}
+        <p class="section-sub" style="margin:10px 0 0">הערכה בלבד לזוג-משפרים; משתנה לפי סגנון.</p>
+      </div>
+    `) : ''}
+
+    ${(tour.apps || []).length ? section('אפליקציות שימושיות', '📱', `
+      <div class="info-card">
+        ${tour.apps.map((a) => `<div class="trans-item"><div class="trans-item__h">${esc(a.name)}</div><div class="trans-item__d">${esc(a.desc || '')}</div></div>`).join('')}
+      </div>
+    `) : ''}
+
+    ${(tour.emergency || []).length ? section('טלפונים לשעת חירום', '🆘', `
+      <div class="info-card">
+        ${tour.emergency.map((e) => `<div class="kv"><span class="k">${esc(e.label)}</span><span class="v" style="font-family:var(--font-latin);direction:ltr">${esc(e.value)}</span></div>`).join('')}
+      </div>
+    `) : ''}
+
+    ${(tour.beforeYouGo || []).length ? section('לפני שיוצאים', '✅', `
+      <div class="info-card"><ul class="checklist">${tour.beforeYouGo.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>
+    `) : ''}
+
     ${(tour.phrasebook || []).length ? section('שיחון · הונגרית', '🗣️', `
       <div class="info-card">
         ${tour.phrasebook.map((p) => `
@@ -96,6 +133,13 @@ export function render({ tour }) {
             <span class="he">${esc(p.he)}</span>
             <span class="lp"><span class="local">${esc(p.local)}</span><br><span class="translit">${esc(p.translit)}</span></span>
           </div>`).join('')}
+      </div>
+    `) : ''}
+
+    ${(tour.photoCredits || []).length ? section('קרדיטים לצילומים', '📷', `
+      <div class="info-card">
+        <p class="section-sub" style="margin-top:0">כל התמונות מ־Wikimedia Commons, ברישיון חופשי (CC / נחלת הכלל).</p>
+        <ul class="credits">${tour.photoCredits.map((c) => `<li><a href="${esc(c.src)}" target="_blank" rel="noopener">${esc(c.t)}</a> — ${esc(c.by)} · ${esc(c.lic)}</li>`).join('')}</ul>
       </div>
     `) : ''}
   `;
