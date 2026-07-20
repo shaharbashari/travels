@@ -12,6 +12,44 @@
 // ============================================================================
 
 /**
+ * @typedef {Object} PlaceLink
+ * @property {string} label
+ * @property {string} url
+ * @property {'tickets'|'website'|'menu'|'info'} type
+ */
+
+/**
+ * @typedef {Object} Place
+ * @property {string} name
+ * @property {string} [he]
+ * @property {'attractions'|'restaurants'|'sweets'|'baths'|'museums'|'views'|'parks'|'shopping'|'nightlife'} category
+ * @property {string} [emoji]
+ * @property {number} [day]
+ * @property {string} [desc]
+ * @property {string} [long]           תיאור עשיר בן 2–4 משפטים
+ * @property {string} [img]            התמונה הראשית לכרטיס
+ * @property {string[]} [images]       גלריה של 1–4 תמונות; img ראשון
+ * @property {PlaceLink[]} [links]     קישורים רשמיים, כרטיסים, תפריט או מידע
+ * @property {string} [address]
+ * @property {string[]} [tags]         2–4 תוויות קצרות
+ * @property {string[]} [tips]         טיפים מפורטים
+ * @property {string} [hours]
+ * @property {string} [price]
+ * @property {string} [tip]            טיפ קצר לתצוגה המקוצרת
+ * @property {string} [badge]
+ * @property {number} [lat]
+ * @property {number} [lng]
+ */
+
+/**
+ * @typedef {Object} ExtraInfoSection
+ * @property {string} title
+ * @property {string} [emoji]
+ * @property {string} [body]
+ * @property {{h:string,d:string}[]} items
+ */
+
+/**
  * @typedef {Object} Tour
  * @property {string} id                מזהה ייחודי (kebab-case), חייב להתאים לשם הקובץ
  * @property {'upcoming'|'active'|'past'} [status]  מחושב גם אוטומטית מהתאריכים
@@ -38,6 +76,7 @@
  * @property {{label:string,value:string}[]} [emergency]  טלפוני חירום
  * @property {{name:string,desc?:string}[]} [apps]        אפליקציות שימושיות
  * @property {string[]} [beforeYouGo]   צ׳קליסט לפני הנסיעה
+ * @property {ExtraInfoSection[]} [extraInfo] מדריכי עומק נוספים לעמוד המידע
  * @property {{t:string,by:string,lic:string,src:string}[]} [photoCredits]  קרדיטים לתמונות
  * @property {Phrase[]} [phrasebook]
  * @property {Day[]} days
@@ -126,6 +165,15 @@ const tourTemplate = {
     { name: 'שם האפליקציה', desc: 'למה היא שימושית.' },
   ],
   beforeYouGo: ['להזמין X מראש', 'להתקין eSIM', 'לבדוק תוקף דרכון'],
+  extraInfo: [
+    {
+      title: 'מדריך עומק', emoji: '🧭',
+      body: 'פתיח קצר ואופציונלי למדריך.',
+      items: [
+        { h: 'כותרת פריט', d: 'תיאור שימושי ומפורט.' },
+      ],
+    },
+  ],
 
   // קרדיטים לתמונות (חובה אם משתמשים בתמונות ברישיון CC-BY / CC-BY-SA)
   photoCredits: [
@@ -152,11 +200,23 @@ const tourTemplate = {
   ],
 
   // ---- מה עושים (מקומות) --------------------------------------------------
-  // category: 'attractions' | 'restaurants' | 'sweets' | 'baths' | 'shopping' | 'nightlife'
-  // שדות אופציונליים: img (URL תמונה), hours, price, tip, badge, lat, lng
+  // category: 'attractions' | 'restaurants' | 'sweets' | 'baths' | 'museums' |
+  //           'views' | 'parks' | 'shopping' | 'nightlife'
+  // שדות עשירים: long, images, links, address, tags, tips
+  // שדות נוספים: img, hours, price, tip, badge, lat, lng
   places: [
-    { name: 'שם המקום', he: '', category: 'attractions', emoji: '📍', day: 1,
-      desc: 'תיאור קצר', img: '', hours: '', price: '', tip: '', badge: '', lat: 0, lng: 0 },
+    {
+      name: 'שם המקום', he: '', category: 'attractions', emoji: '📍', day: 1,
+      desc: 'תיאור קצר לכרטיס.',
+      long: 'תיאור עשיר בן שניים עד ארבעה משפטים לעמוד המקום. כאן מוסיפים הקשר, אווירה וסיבה אמיתית להגיע.',
+      img: 'https://upload.wikimedia.org/.../500px-photo.jpg',
+      images: ['https://upload.wikimedia.org/.../500px-photo.jpg'],
+      links: [{ label: 'האתר הרשמי', url: 'https://example.com/', type: 'website' }],
+      address: 'כתובת רחוב מלאה',
+      tags: ['קלאסי', 'לא לפספס', 'מצטלם'],
+      tips: ['טיפ שימושי ראשון.', 'טיפ שימושי נוסף.'],
+      hours: '', price: '', tip: '', badge: '', lat: 0, lng: 0,
+    },
   ],
 };
 

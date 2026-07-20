@@ -50,7 +50,7 @@ function highlights(tour) {
     <div class="filter-chips" style="gap:14px">
       ${picks.map((p) => {
         const c = CATEGORIES[p.category] || {};
-        return `<a class="place-card washi" style="--wc:${c.color};min-width:260px;flex:0 0 auto" href="#/t/${encodeURIComponent(tour.id)}/explore/${p.category}">
+        return `<a class="place-card washi" style="--wc:${c.color};min-width:260px;flex:0 0 auto" href="#/t/${encodeURIComponent(tour.id)}/place/${encodeURIComponent(p.id)}">
           ${thumb(p.img, p.emoji || c.emoji, { color: c.color })}
           <div>
             <div class="place-card__name">${esc(p.name)}</div>

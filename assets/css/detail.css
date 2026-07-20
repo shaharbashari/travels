@@ -1,4 +1,227 @@
 /* =============================================================================
    detail.css — עמוד פרטי מקום/אטרקציה (views/place.js).
    מנוהל ע"י שכבת "פרטי מקום". נטען מ-index.html.
+   בהיר · שובב · מעוגל · RTL · reuse of :root tokens from styles.css.
    ========================================================================== */
+
+.detail { padding-bottom: 12px; }
+.detail-empty { color: var(--ink-soft); padding: 40px 0; text-align: center; }
+
+.detail-back { margin: 4px 0 16px; }
+
+/* ---------- Layout: single column (mobile) → two columns (desktop) -------- */
+.detail-grid { display: flex; flex-direction: column; gap: 18px; }
+.detail-media, .detail-content { display: contents; }
+
+/* mobile reading order */
+.detail-hero    { order: 1; }
+.detail-meta    { order: 2; }
+.detail-facts   { order: 3; }
+.detail-actions { order: 4; }
+.detail-prose   { order: 5; }
+.detail-tips    { order: 6; }
+.detail-gallery { order: 7; }
+.detail-mapwrap { order: 8; }
+
+/* ---------- Hero --------------------------------------------------------- */
+.detail-hero {
+  position: relative; aspect-ratio: 16 / 11; border-radius: var(--r-xl);
+  overflow: hidden; box-shadow: var(--shadow-lg); isolation: isolate;
+  background: linear-gradient(150deg,
+    color-mix(in srgb, var(--c, var(--gold)) 24%, #fff),
+    color-mix(in srgb, var(--c, var(--gold)) 55%, #fff));
+}
+.detail-hero__media, .detail-hero__scrim, .detail-hero__cap { position: absolute; inset: 0; }
+.detail-hero__media.is-zoom { cursor: zoom-in; }
+.detail-hero__media .thumb { width: 100%; height: 100%; border-radius: 0; box-shadow: none; }
+.detail-hero .thumb__em { font-size: clamp(3rem, 11vw, 5.5rem); }
+.detail-hero__scrim {
+  pointer-events: none;
+  background: linear-gradient(to top, rgba(20,16,30,.62) 0%, rgba(20,16,30,.16) 42%, transparent 66%);
+}
+.detail-hero__cap {
+  pointer-events: none;
+  display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start;
+  gap: 10px; padding: clamp(16px, 4vw, 26px);
+}
+.detail-hero__title {
+  font-family: var(--font-display); font-weight: 800; color: #fff;
+  font-size: clamp(1.6rem, 6vw, 2.5rem); line-height: 1.12;
+  text-shadow: 0 2px 14px rgba(0,0,0,.4);
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+}
+.detail-hero__title .lat {
+  font-family: var(--font-latin); font-weight: 600; font-size: .6em;
+  color: rgba(255,255,255,.82); direction: ltr;
+}
+.detail-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 13px; border-radius: var(--pill);
+  background: color-mix(in srgb, var(--c, var(--gold)) 88%, #fff);
+  color: #fff; font-weight: 700; font-size: .82rem;
+  box-shadow: 0 6px 18px -6px rgba(0,0,0,.5); border: 1.5px solid rgba(255,255,255,.5);
+}
+.detail-chip__em { font-size: 1.05em; }
+
+/* ---------- Meta row ----------------------------------------------------- */
+.detail-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.detail-daychip, .detail-rating { font-weight: 700; }
+.detail-rating { color: var(--gold-deep); }
+.detail-badge {
+  background: color-mix(in srgb, var(--c, var(--gold)) 15%, #fff);
+  color: color-mix(in srgb, var(--c, var(--gold)) 72%, var(--ink));
+  border-color: color-mix(in srgb, var(--c, var(--gold)) 34%, #fff);
+}
+.detail-tag { color: var(--danube-deep); }
+
+/* ---------- Facts card --------------------------------------------------- */
+.detail-facts { padding: 6px 18px; }
+.fact {
+  display: grid; grid-template-columns: 1.7rem auto 1fr; align-items: baseline; gap: 10px;
+  padding: 12px 0; border-bottom: 1px solid var(--line);
+}
+.fact:last-child { border-bottom: 0; }
+.fact__ic { font-size: 1.05rem; }
+.fact__k { color: var(--ink-soft); font-weight: 600; font-size: .9rem; }
+.fact__v { text-align: end; font-weight: 700; }
+
+/* ---------- Action buttons ----------------------------------------------- */
+.detail-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.detail-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 11px 17px; border-radius: var(--pill); font-weight: 700; font-size: .92rem;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-sm); transition: transform .16s ease, box-shadow .16s ease, filter .16s ease;
+}
+.detail-btn:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.detail-btn__ic { font-size: 1.1em; }
+.detail-btn--maps { background: var(--grad-danube); color: #fff; border-color: transparent; box-shadow: var(--shadow); }
+.detail-btn--maps:hover { filter: brightness(1.05); box-shadow: var(--shadow-lg); }
+
+/* ---------- Prose -------------------------------------------------------- */
+.detail-prose p { margin: 0 0 14px; font-size: 1.02rem; line-height: 1.75; color: var(--ink); }
+.detail-prose p:last-child { margin-bottom: 0; }
+
+/* ---------- Section headings --------------------------------------------- */
+.detail-h2 {
+  font-family: var(--font-display); font-weight: 800; font-size: 1.22rem;
+  display: flex; align-items: center; gap: 8px; margin: 2px 0 12px;
+}
+.detail-h2 .em { font-size: 1.15em; }
+
+/* ---------- Tips --------------------------------------------------------- */
+.detail-tip-list { display: grid; gap: 10px; }
+.detail-tip {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: color-mix(in srgb, var(--gold) 12%, #fff);
+  border: 1px solid color-mix(in srgb, var(--gold) 26%, #fff);
+  border-radius: var(--r); padding: 12px 15px; font-size: .95rem; line-height: 1.5;
+}
+.detail-tip::before { content: "💡"; flex: none; }
+
+/* ---------- Gallery ------------------------------------------------------ */
+.detail-gallery__grid {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+}
+.detail-shot {
+  position: relative; aspect-ratio: 1; border-radius: var(--r); overflow: hidden;
+  padding: 0; cursor: zoom-in; box-shadow: var(--shadow-sm);
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+.detail-shot:hover { transform: translateY(-2px) scale(1.01); box-shadow: var(--shadow); }
+.detail-shot .thumb { width: 100%; height: 100%; border-radius: inherit; box-shadow: none; }
+
+/* ---------- Mini-map ----------------------------------------------------- */
+.detail-map {
+  height: 260px; border-radius: var(--r-lg); overflow: hidden;
+  box-shadow: var(--shadow); border: 1px solid var(--line); z-index: 1;
+}
+.detail-map__fallback { padding: 24px; text-align: center; color: var(--ink-soft); }
+
+/* ---------- Related cards ------------------------------------------------ */
+.detail-related { margin-top: 26px; }
+.detail-related__grid {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.rel-card {
+  display: flex; flex-direction: column; gap: 0;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--shadow);
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+.rel-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+.rel-card__img.thumb { width: 100%; aspect-ratio: 4 / 3; border-radius: 0; box-shadow: none; }
+.rel-card__body { padding: 11px 13px 14px; }
+.rel-card__name { font-family: var(--font-display); font-weight: 800; font-size: 1.02rem; }
+.rel-card__desc {
+  color: var(--ink-soft); font-size: .84rem; margin-top: 4px; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* =============================================================================
+   Clickable place cards (explore.js) — full-cover navigation link
+   ========================================================================== */
+.place-card.is-clickable { cursor: pointer; }
+.card-cover-link { position: absolute; inset: 0; z-index: 1; border-radius: var(--r-lg); }
+.place-card .place-card__foot a,
+.place-card .place-card__foot .place-link { position: relative; z-index: 2; }
+
+/* =============================================================================
+   Lightbox — fullscreen image overlay
+   ========================================================================== */
+body.lightbox-open { overflow: hidden; }
+.lightbox {
+  position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center;
+  padding: clamp(16px, 4vw, 48px);
+  background: rgba(18, 14, 28, .84); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  animation: lb-fade .22s ease;
+}
+@keyframes lb-fade { from { opacity: 0; } to { opacity: 1; } }
+.lightbox__img {
+  max-width: min(94vw, 1100px); max-height: 86vh; width: auto; height: auto;
+  border-radius: var(--r-lg); box-shadow: var(--shadow-lg); background: #fff;
+  animation: lb-pop .24s cubic-bezier(.2,.7,.2,1);
+}
+@keyframes lb-pop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+.lightbox__close, .lightbox__nav {
+  position: absolute; display: grid; place-items: center; color: #fff;
+  background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.24);
+  border-radius: 50%; line-height: 1; transition: background .16s ease, transform .16s ease;
+}
+.lightbox__close:hover, .lightbox__nav:hover { background: rgba(255,255,255,.28); transform: scale(1.06); }
+.lightbox__close { top: 16px; inset-inline-end: 16px; width: 46px; height: 46px; font-size: 1.7rem; }
+.lightbox__nav { top: 50%; transform: translateY(-50%); width: 54px; height: 54px; font-size: 2rem; font-weight: 700; }
+.lightbox__nav:hover { transform: translateY(-50%) scale(1.06); }
+.lightbox__nav--prev { inset-inline-end: 18px; }
+.lightbox__nav--next { inset-inline-start: 18px; }
+.lightbox__count {
+  position: absolute; bottom: 18px; inset-inline: 0; text-align: center;
+  color: rgba(255,255,255,.9); font-family: var(--font-latin); font-weight: 600; letter-spacing: .5px;
+}
+
+/* =============================================================================
+   RESPONSIVE — two-column desktop with sticky media
+   ========================================================================== */
+@media (min-width: 720px) {
+  .detail-grid {
+    display: grid; align-items: start; gap: 30px;
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  }
+  .detail-media, .detail-content { display: flex; flex-direction: column; gap: 20px; }
+  .detail-media { position: sticky; top: calc(var(--top-h, 60px) + 20px); }
+  .detail-hero, .detail-meta, .detail-facts, .detail-actions,
+  .detail-prose, .detail-tips, .detail-gallery, .detail-mapwrap { order: 0; }
+  .detail-gallery__grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  .detail-related__grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+}
+
+@media (min-width: 960px) {
+  .detail-grid { gap: 38px; }
+  .detail-hero { aspect-ratio: 4 / 3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lightbox, .lightbox__img { animation: none; }
+}

@@ -32,6 +32,7 @@
 | `emergency?` | `{label, value}[]` | | טלפוני חירום. |
 | `apps?` | `{name, desc?}[]` | | אפליקציות שימושיות. |
 | `beforeYouGo?` | string[] | | צ׳קליסט לפני הנסיעה. |
+| `extraInfo?` | `ExtraInfoSection[]` | | מדריכי עומק נוספים לעמוד המידע: שכונות, אוכל, טיולי יום וטיפים. |
 | `photoCredits?` | `{t, by, lic, src}[]` | | קרדיטים לתמונות (חובה ל-CC-BY/CC-BY-SA). |
 | `phrasebook?` | `Phrase[]` | | שיחון. |
 | `days` | `Day[]` | ✅ | המסלול היומי. |
@@ -72,6 +73,12 @@
 { he, local, translit }   // עברית · שפת היעד · תעתיק בעברית
 ```
 
+### ExtraInfoSection
+```
+{ title, emoji?, body?, items: [ { h, d } ] }
+```
+`title` הוא שם המדריך, `body` פתיח אופציונלי, וכל פריט כולל כותרת קצרה (`h`) ותיאור (`d`).
+
 ### Day
 ```
 { index:number, date:'YYYY-MM-DD', title, subtitle?,
@@ -89,10 +96,17 @@
 ### Place
 ```
 { name, he?, category, emoji?, day?, desc?, badge?,
-  img?, hours?, price?, tip?, lat?, lng? }
+  img?, long?, images?, links?, address?, tags?, tips?,
+  hours?, price?, tip?, lat?, lng? }
 ```
-`category` ∈ `attractions` · `restaurants` · `sweets` · `baths` · `shopping` · `nightlife`
+`category` ∈ `attractions` · `restaurants` · `sweets` · `baths` · `museums` · `views` · `parks` · `shopping` · `nightlife`
 (מוגדר ב-`assets/js/util.js` → `CATEGORIES`; שם אפשר להוסיף קטגוריות חדשות).
 `img` — כתובת תמונה (URL). מוצגת בכרטיס המקום, בציר הזמן ובחלון המפה; אם חסרה/נכשלת מוצג אימוג׳י.
-`hours` / `price` / `tip` — שעות פתיחה, מחיר וטיפ (מוצגים כצ׳יפים/הערה).
+`long` — תיאור עשיר בן 2–4 משפטים לעמוד פרטי המקום.
+`images` — מערך של 1–4 כתובות תמונה לגלריה; כאשר יש `img`, הוא צריך להופיע ראשון.
+`links` — מערך קישורים במבנה `{label, url, type}`, כאשר `type` הוא `tickets` · `website` · `menu` · `info`.
+`address` — כתובת הרחוב המוצגת בפרטי המקום.
+`tags` — 2–4 תוויות קצרות, למשל `['קלאסי', 'לא לפספס', 'מצטלם']`.
+`tips` — מערך טיפים מפורטים; אפשר להשאיר גם `tip` יחיד לתאימות ולתצוגה המקוצרת.
+`hours` / `price` / `tip` — שעות פתיחה, מחיר וטיפ קצר (מוצגים כצ׳יפים/הערה).
 אם קיימים `lat`/`lng` — המקום מופיע על המפה.

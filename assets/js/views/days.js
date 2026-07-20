@@ -13,7 +13,7 @@ function timelineItem(tour, item, isLast, places) {
   const place = item.place ? places.get(item.place) : null;
   const placeLink = item.place
     ? (place
-        ? `<a class="place-link" href="#/t/${encodeURIComponent(tour.id)}/explore/${place.category}">📍 ${esc(item.place)} ›</a>`
+        ? `<a class="place-link" href="#/t/${encodeURIComponent(tour.id)}/place/${encodeURIComponent(place.id)}">📍 ${esc(item.place)} ›</a>`
         : `<span class="place-link" style="color:var(--ink-soft)">📍 ${esc(item.place)}</span>`)
     : '';
   return `

@@ -39,7 +39,8 @@ function placeCard(tour, p) {
   const c = CATEGORIES[p.category] || {};
   const sub = p.he && p.he.trim();
   return `
-    <div class="place-card washi" style="--wc:${c.color}">
+    <div class="place-card washi is-clickable" style="--wc:${c.color}">
+      <a class="card-cover-link" href="#/t/${encodeURIComponent(tour.id)}/place/${encodeURIComponent(p.id)}" aria-label="${esc(p.name)}"></a>
       ${thumb(p.img, p.emoji || c.emoji, { color: c.color })}
       <div>
         <div class="place-card__name">${esc(p.name)} ${sub ? `<span class="lat">${esc(p.he)}</span>` : ''}</div>

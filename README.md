@@ -1,8 +1,8 @@
 # הטיולים של הדר · Hadar's Travels
 
-יומן מסעות אישי — אתר רספונסיבי בעברית (RTL) לתכנון וצפייה בטיולים. מסלול יומי, טיסות, מלון, מזג אוויר, אריזה, תחבורה, שיחון ומפה אינטראקטיבית — לכל טיול.
+יומן מסעות אישי — אתר רספונסיבי בעברית (RTL) לתכנון וצפייה בטיולים. מסלול יומי, טיסות, מלון, מזג אוויר, אריזה, תחבורה, שיחון ומפה אינטראקטיבית — לכל טיול. **אינטראקטיבי** (עמוד פרטים לכל מקום עם גלריה, טיפים וקישורים), **ניתן לעריכה מהדפדפן** (הוספת טיולים/מקומות בלחיצה) ועם **התחברות Google** לעורכים מורשים.
 
-> **🌐 אתר חי:** _יעודכן לאחר הפריסה_ · `https://shaharbashari.github.io/travels/`
+> **🌐 אתר חי:** `https://shaharbashari.github.io/travels/`
 
 הטיול הראשון: **בודפשט 2026** 🇭🇺 (הדר ורז).
 
@@ -26,29 +26,34 @@
 travels/
 ├── index.html                 # שלד האפליקציה (טוען פונטים, Leaflet, והמודול הראשי)
 ├── .nojekyll                  # ל-GitHub Pages (מגיש קבצים שמתחילים ב-_ , מדלג על Jekyll)
+├── firestore.rules            # חוקי אבטחה ל-Firestore (קריאה לכולם, כתיבה רק לעורכים)
 ├── README.md                  # הקובץ הזה
 ├── assets/
-│   ├── css/styles.css         # מערכת העיצוב (טוקנים, רכיבים, רספונסיביות, dark mode)
+│   ├── css/
+│   │   ├── styles.css         # מערכת העיצוב (טוקנים, רכיבים, רספונסיביות)
+│   │   ├── detail.css         # עמוד פרטי מקום (גלריה, lightbox)
+│   │   └── edit.css           # ממשק העריכה (כפתורי +, מודאלים) — לעורכים
 │   ├── img/                   # favicon (איורי SVG מקוריים)
 │   └── js/
-│       ├── app.js             # נקודת כניסה: טוען נתונים, בונה topbar + טאבים, מרנדר מסך
-│       ├── router.js          # ניתוב מבוסס-hash
-│       ├── util.js            # עזרי תאריכים, קטגוריות, escaping, אנימציות
+│       ├── app.js             # נקודת כניסה: store+auth, topbar+טאבים, רינדור מסך
+│       ├── store.js           # שכבת נתונים: seed + Firestore/localStorage (overlay) + CRUD
+│       ├── auth.js            # התחברות Google + הרשאות עריכה (רשימת עורכים מורשים)
+│       ├── firebase.js        # אתחול Firebase (רדום אם לא הוגדר — אז מצב מקומי)
+│       ├── edit.js            # ממשק הוספה/עריכה (מוצג רק לעורכים)
+│       ├── router.js          # ניתוב מבוסס-hash (כולל #/t/<id>/place/<placeId>)
+│       ├── util.js            # תאריכים, קטגוריות, escaping, thumb(), pid/slug/iconFor
 │       ├── svg.js             # קו רקיע SVG מקורי של בודפשט
-│       └── views/             # מסך אחד לכל טאב
-│           ├── trips.js       #   רשימת הטיולים (עמוד הבית)
-│           ├── home.js        #   בית הטיול (ספירה לאחור, מבט מהיר, רגעים לא לפספס)
-│           ├── days.js        #   מסלול יומי (ציר זמן)
-│           ├── explore.js     #   מה עושים (קטגוריות + מקומות)
-│           ├── map.js         #   מפה (Leaflet)
-│           └── info.js        #   מידע (טיסות, מלון, מזג אוויר, אריזה, תחבורה, שיחון)
+│       └── views/             # מסך אחד לכל טאב + עמוד פרטי מקום
+│           ├── trips.js  home.js  days.js  explore.js  map.js  info.js
+│           └── place.js       #   עמוד פרטי מקום (גלריה, טיפים, קישורים, מפה קטנה)
 └── data/
     ├── config.js              # הגדרות כלליות (שם האתר, סלוגן)
+    ├── firebase-config.js     # קונפיג Firebase (ציבורי) — מלאו כדי להפעיל התחברות/ענן
     ├── schema.md              # תיעוד מלא של מבנה הנתונים של טיול
     └── tours/
-        ├── index.js           # רישום הטיולים ⟵ מוסיפים כאן טיול חדש
+        ├── index.js           # רישום הטיולים ⟵ מוסיפים כאן טיול חדש (בקוד)
         ├── _template.js       # תבנית לטיול חדש (להעתיק)
-        └── budapest-2026.js   # נתוני טיול בודפשט
+        └── budapest-2026.js   # נתוני טיול בודפשט (משמש כ-seed)
 ```
 
 ---
@@ -82,7 +87,27 @@ python -m http.server 8000
 
 ## ✏️ עריכת טיול קיים
 
-עורכים את הקובץ המתאים תחת `data/tours/` (למשל `budapest-2026.js`) — מסלול, טיסות, מקומות וכו׳. שומרים, מרעננים.
+יש **שתי דרכים** לערוך תוכן:
+
+**א. מהדפדפן (הכי קל — להדר):** נכנסים לאתר, מתחברים (כפתור 🔑 בכותרת), ואז מופיעים כפתורי **➕** ועפרונות ✏️. אפשר להוסיף/לערוך טיולים, אטרקציות, מסעדות וכו׳ בטופס ידידותי — עם השלמה אוטומטית, מילוי אייקון אוטומטי, והצעות תמונה אוטומטיות (מ-Wikimedia). השינויים נשמרים בענן ומופיעים לכולם.
+
+**ב. בקוד:** עורכים את הקובץ המתאים תחת `data/tours/` (למשל `budapest-2026.js`). קובץ ה-seed הוא נקודת ההתחלה; עריכות בענן "גוברות" עליו.
+
+---
+
+## 🔐 התחברות Google + עריכה בענן (הגדרה חד-פעמית)
+
+האתר עובד **מיד** גם בלי הגדרה — קריאה לכולם, ו"מצב עריכה מקומי" שנשמר בדפדפן שלך בלבד. כדי להפעיל **התחברות Google** ו**שמירה משותפת בענן** (כך שרק `hadarlap@gmail.com` ו-`shahar.bashari@gmail.com` יוכלו לערוך, וכולם יראו את השינויים) — הגדירו Firebase פעם אחת (חינם):
+
+1. צרו פרויקט ב-[Firebase Console](https://console.firebase.google.com) → **Add project**.
+2. **Build → Firestore Database → Create database** (מצב Production).
+3. **Build → Authentication → Get started → Sign-in method → Google → Enable**.
+4. **Authentication → Settings → Authorized domains** → הוסיפו `shaharbashari.github.io` (ו-`localhost` לפיתוח).
+5. **Project settings ⚙️ → General → Your apps → Web app (</>)** → צרו אפליקציית web והעתיקו את אובייקט `firebaseConfig`. הדביקו אותו ב-`data/firebase-config.js` (במקום ערכי ה-`YOUR_...`). זה מידע **ציבורי** — מותר להעלות ל-git.
+6. **Firestore → Rules** → הדביקו את התוכן של `firestore.rules` (בשורש הריפו) → **Publish**. החוקים מרשים קריאה לכולם וכתיבה רק לשני המיילים.
+7. `git push` — וזהו. לחצו 🔑 באתר, התחברו עם Google, וכפתורי העריכה יופיעו.
+
+> רוצים להוסיף עורך? הוסיפו את המייל ב-**שני** מקומות: `EDITOR_EMAILS` ב-`assets/js/auth.js` וברשימה שב-`firestore.rules` (ואז Publish מחדש).
 
 ---
 
@@ -102,15 +127,15 @@ git push
 
 ## 🎨 עיצוב וגישה
 
-- **RTL + עברית** לאורך כל האתר; שמות לועזיים בפונט Serif ייעודי.
+- **RTL + עברית** לאורך כל האתר; בהיר, צבעוני ומשחקי.
 - **רספונסיבי:** בנייד — סרגל טאבים תחתון; בדסקטופ — ניווט עליון ופריסות רחבות.
-- **Dark mode** אוטומטי לפי העדפת המערכת.
+- **תמיד בהיר** (ללא dark mode) — לפי בקשת המשתמשת.
 - **נגישות:** HTML סמנטי, `dir="rtl"`, מצבי focus, כיבוד `prefers-reduced-motion`.
-- **פונטים:** Assistant (גוף), Frank Ruhl Libre (כותרות), Fraunces (לועזי) — מ-Google Fonts.
-- **תמונות:** איורי SVG מקוריים בלבד (ללא תמונות המוגנות בזכויות יוצרים).
+- **פונטים משחקיים:** Varela Round (כותרות), Rubik (גוף), Fredoka (מספרים/לועזי) — מ-Google Fonts.
+- **תמונות:** צילומים אמיתיים ברישיון חופשי מ-Wikimedia Commons (עם קרדיטים בטאב "מידע"), עם נפילה חיננית לאימוג׳י אם תמונה חסרה. איורי SVG מקוריים ל-favicon/hero.
 
 ---
 
 ## 🧩 טכנולוגיה
 
-Vanilla JS (ES modules) · CSS מודרני (custom properties, logical properties, `color-mix`) · Leaflet + OpenStreetMap למפה · ללא framework וללא שלב build.
+Vanilla JS (ES modules) · CSS מודרני (custom properties, logical properties, `color-mix`) · Leaflet + OpenStreetMap למפה · **Firebase (Auth + Firestore)** להתחברות Google ולשמירה בענן (אופציונלי; נטען מ-CDN, ללא build) · ללא framework וללא שלב build.

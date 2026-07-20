@@ -16,7 +16,7 @@ function points(tour) {
   (tour.places || []).forEach((p) => {
     if (p.lat && p.lng) {
       const c = CATEGORIES[p.category] || {};
-      pts.push({ name: p.name, lat: p.lat, lng: p.lng, emoji: p.emoji || c.emoji,
+      pts.push({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, emoji: p.emoji || c.emoji,
         color: c.color, catLabel: c.he, desc: p.desc, img: p.img });
     }
   });
@@ -64,6 +64,7 @@ export function mount({ tour }, root) {
         <strong>${esc(p.name)}</strong><br>
         <span style="color:#6c6156;font-size:.85em">${esc(p.catLabel || '')}</span>
         ${p.desc ? `<br><span style="font-size:.85em">${esc(p.desc)}</span>` : ''}
+        ${p.id ? `<br><a href="#/t/${encodeURIComponent(tour.id)}/place/${encodeURIComponent(p.id)}">פרטים ›</a>` : ''}
         <br><a href="${gmaps(p.name)}" target="_blank" rel="noopener">פתח במפות ›</a>
       </div>`);
     markers.push(m);

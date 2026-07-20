@@ -1,4 +1,285 @@
 /* =============================================================================
    edit.css — ממשק העריכה/הוספה (assets/js/edit.js): כפתורי +, טפסים, מודאלים.
    מוצג רק לעורכים מורשים. נטען מ-index.html.
+   כל הסלקטורים ממודרים תחת #edit-layer / .edit-pencil כדי לא להשפיע על הקוראים.
    ========================================================================== */
+
+/* ---------- Layer shell -------------------------------------------------- */
+#edit-layer {
+  position: fixed; inset: 0; z-index: 900; pointer-events: none;
+  font-family: var(--font-body); color: var(--ink);
+}
+#edit-layer button { font: inherit; }
+
+/* ============================================================================
+   FLOATING ACTION BUTTON  (+ context menu)
+   ========================================================================== */
+.ed-fab__wrap {
+  position: fixed; z-index: 950; pointer-events: auto;
+  inset-inline-end: 16px;
+  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 16px);
+  display: flex; flex-direction: column; align-items: flex-end; gap: 12px;
+}
+.ed-fab {
+  width: 60px; height: 60px; border-radius: var(--pill);
+  display: grid; place-items: center;
+  background: var(--grad-candy); color: #fff;
+  box-shadow: var(--shadow-lg), 0 0 0 4px rgba(255, 255, 255, .55);
+  transition: transform .18s cubic-bezier(.2, .8, .2, 1), filter .18s ease;
+}
+.ed-fab:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.04); }
+.ed-fab:active { transform: scale(.96); }
+.ed-fab__plus {
+  font-size: 2rem; line-height: 0; font-weight: 700;
+  transition: transform .25s cubic-bezier(.2, .8, .2, 1);
+}
+.ed-fab.is-open .ed-fab__plus { transform: rotate(135deg); }
+
+.ed-fab__menu {
+  display: none; flex-direction: column; gap: 6px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-lg);
+  padding: 8px; min-width: 208px;
+  transform-origin: bottom var(--_o, right);
+}
+.ed-fab__menu.is-open {
+  display: flex;
+  animation: ed-pop .18s cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes ed-pop { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+.ed-fab__item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 13px; border-radius: var(--r); text-align: start;
+  font-weight: 700; color: var(--ink); width: 100%;
+  transition: background .14s ease, transform .14s ease;
+}
+.ed-fab__item:hover { background: var(--surface-2); transform: translateX(-2px); }
+.ed-fab__item-emoji { font-size: 1.2rem; }
+
+/* ============================================================================
+   MODAL  (scrim + rounded panel)
+   ========================================================================== */
+.ed-scrim {
+  position: fixed; inset: 0; z-index: 1000; pointer-events: auto;
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 0;
+  background: rgba(44, 40, 66, .40);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  opacity: 0; transition: opacity .2s ease;
+}
+.ed-scrim.is-in { opacity: 1; }
+.ed-scrim.is-out { opacity: 0; }
+
+.ed-modal {
+  pointer-events: auto;
+  width: 100%; max-width: 620px; max-height: 92dvh;
+  display: flex; flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  box-shadow: var(--shadow-lg);
+  transform: translateY(100%); transition: transform .26s cubic-bezier(.2, .8, .2, 1);
+}
+.ed-scrim.is-in .ed-modal { transform: none; }
+.ed-scrim.is-out .ed-modal { transform: translateY(100%); }
+
+.ed-modal__head {
+  flex: none; display: flex; align-items: center; gap: 12px;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.ed-modal__title {
+  font-family: var(--font-display); font-size: 1.3rem; font-weight: 800;
+  flex: 1;
+}
+.ed-modal__close {
+  width: 38px; height: 38px; border-radius: var(--pill); flex: none;
+  display: grid; place-items: center; font-size: 1.05rem;
+  background: var(--surface-2); color: var(--ink-soft);
+  transition: background .14s ease, color .14s ease, transform .14s ease;
+}
+.ed-modal__close:hover { background: var(--paprika); color: #fff; transform: rotate(90deg); }
+
+.ed-modal__form { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.ed-modal__body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px 20px; -webkit-overflow-scrolling: touch; }
+
+.ed-modal__foot {
+  flex: none; padding: 12px 20px calc(14px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line); background: var(--canvas-2);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.ed-modal__actions { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+
+/* ---------- Forms -------------------------------------------------------- */
+.ed-form { display: flex; flex-direction: column; gap: 14px; }
+.ed-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ed-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ed-label { font-weight: 700; font-size: .9rem; color: var(--ink-soft); }
+.ed-hint { font-size: .78rem; color: var(--ink-faint); }
+.ed-inline { display: flex; gap: 8px; align-items: stretch; }
+.ed-inline .ed-input { flex: 1; min-width: 0; }
+
+.ed-input, .ed-select, .ed-textarea {
+  width: 100%; font: inherit; color: var(--ink);
+  background: var(--surface-2);
+  border: 1.5px solid var(--line-strong); border-radius: var(--r-sm);
+  padding: 11px 13px;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.ed-input::placeholder, .ed-textarea::placeholder { color: var(--ink-faint); }
+.ed-input:focus, .ed-select:focus, .ed-textarea:focus {
+  outline: none; border-color: var(--danube);
+  background: var(--surface); box-shadow: var(--ring);
+}
+.ed-input:disabled, .ed-select:disabled { opacity: .6; cursor: not-allowed; }
+.ed-input--err { border-color: var(--paprika); box-shadow: 0 0 0 3px rgba(255, 77, 103, .25); }
+.ed-textarea { resize: vertical; min-height: 46px; line-height: 1.5; }
+.ed-input--emoji { text-align: center; font-size: 1.3rem; max-width: 110px; }
+.ed-select { appearance: none; -webkit-appearance: none; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-faint) 50%), linear-gradient(135deg, var(--ink-faint) 50%, transparent 50%);
+  background-position: calc(0% + 16px) 50%, calc(0% + 21px) 50%;
+  background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+  padding-inline-start: 34px;
+}
+
+/* ---------- Repeatable rows --------------------------------------------- */
+.ed-repeat { display: flex; flex-direction: column; gap: 8px; }
+.ed-repeat__rows { display: flex; flex-direction: column; gap: 8px; }
+.ed-repeat__row { display: flex; gap: 8px; align-items: center; }
+.ed-repeat__row .ed-input { flex: 1; min-width: 0; }
+.ed-repeat__row--link { display: grid; grid-template-columns: 1fr 1.4fr auto auto; gap: 8px; }
+.ed-repeat__del {
+  width: 38px; height: 38px; flex: none; border-radius: var(--r-sm);
+  display: grid; place-items: center; font-size: .85rem;
+  background: var(--surface-2); color: var(--ink-faint); border: 1.5px solid var(--line);
+  transition: background .14s ease, color .14s ease;
+}
+.ed-repeat__del:hover { background: color-mix(in srgb, var(--paprika) 14%, #fff); color: var(--paprika); }
+.ed-repeat__add {
+  align-self: flex-start;
+  padding: 7px 14px; border-radius: var(--pill); font-weight: 700; font-size: .85rem;
+  background: var(--surface-2); color: var(--danube-deep);
+  border: 1.5px dashed color-mix(in srgb, var(--danube) 45%, #fff);
+  transition: background .14s ease, transform .14s ease;
+}
+.ed-repeat__add:hover { background: color-mix(in srgb, var(--danube) 10%, #fff); transform: translateY(-1px); }
+
+/* ---------- Image suggestions grid -------------------------------------- */
+.ed-imgs:empty { display: none; }
+.ed-imgs { margin-top: 2px; }
+.ed-imgs__grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  padding: 10px; border-radius: var(--r); background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.ed-imgs__item {
+  position: relative; aspect-ratio: 4 / 3; border-radius: var(--r-sm); overflow: hidden;
+  border: 2px solid transparent; box-shadow: var(--shadow-sm);
+  transition: transform .14s ease, border-color .14s ease;
+}
+.ed-imgs__item img { width: 100%; height: 100%; object-fit: cover; }
+.ed-imgs__item:hover { transform: translateY(-2px) scale(1.02); border-color: var(--danube); }
+.ed-imgs__status, .ed-imgs__empty {
+  padding: 14px; text-align: center; color: var(--ink-soft); font-weight: 600; font-size: .9rem;
+  background: var(--surface-2); border-radius: var(--r); border: 1px solid var(--line);
+}
+.ed-imgs__empty { color: var(--ink-faint); }
+.ed-imgs__hint { margin-top: 6px; font-size: .74rem; color: var(--ink-faint); text-align: center; }
+
+/* ---------- Buttons ------------------------------------------------------ */
+.ed-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 11px 18px; border-radius: var(--pill); font-weight: 700; white-space: nowrap;
+  background: var(--surface); color: var(--ink); border: 1.5px solid var(--line-strong);
+  box-shadow: var(--shadow-sm);
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+.ed-btn:hover { transform: translateY(-1px); }
+.ed-btn:active { transform: translateY(0); }
+.ed-btn--primary { background: var(--grad-danube); color: #fff; border-color: transparent; box-shadow: var(--shadow); }
+.ed-btn--primary:hover { filter: brightness(1.05); box-shadow: var(--shadow-lg); }
+.ed-btn--ghost { background: var(--surface); color: var(--ink); }
+.ed-btn--ghost:hover { background: var(--surface-2); }
+.ed-btn--danger { background: color-mix(in srgb, var(--paprika) 12%, #fff); color: var(--paprika); border-color: color-mix(in srgb, var(--paprika) 30%, #fff); box-shadow: none; }
+.ed-btn--danger:hover { background: var(--paprika); color: #fff; border-color: transparent; }
+.ed-btn--sm { padding: 8px 13px; font-size: .85rem; }
+.ed-btn--pushstart { margin-inline-end: auto; }
+.ed-btn.is-busy { opacity: .7; cursor: progress; }
+.ed-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+/* ---------- Storage note ------------------------------------------------- */
+.ed-note { font-size: .78rem; color: var(--ink-faint); text-align: center; line-height: 1.4; }
+.ed-note--menu { padding: 8px 6px 4px; border-top: 1px dashed var(--line); margin-top: 4px; }
+
+/* ============================================================================
+   CONFIRM dialog (stacks above the modal)
+   ========================================================================== */
+.ed-scrim--confirm { z-index: 1100; align-items: center; padding: 20px; }
+.ed-confirm {
+  pointer-events: auto; width: 100%; max-width: 380px;
+  background: var(--surface); border-radius: var(--r-xl); box-shadow: var(--shadow-lg);
+  padding: 22px; text-align: center;
+  transform: scale(.94); transition: transform .2s cubic-bezier(.2, .8, .2, 1);
+}
+.ed-scrim--confirm.is-in .ed-confirm { transform: none; }
+.ed-confirm__msg { font-weight: 700; font-size: 1.05rem; margin-bottom: 18px; line-height: 1.5; }
+.ed-confirm__actions { display: flex; gap: 10px; justify-content: center; }
+.ed-confirm__actions .ed-btn { flex: 1; }
+
+/* ============================================================================
+   TOASTS
+   ========================================================================== */
+.ed-toasts {
+  position: fixed; z-index: 1200; pointer-events: none;
+  inset-inline: 0; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 84px);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.ed-toast {
+  pointer-events: auto;
+  background: var(--ink); color: #fff; font-weight: 700; font-size: .92rem;
+  padding: 11px 20px; border-radius: var(--pill); box-shadow: var(--shadow-lg);
+  opacity: 0; transform: translateY(12px) scale(.96);
+  transition: opacity .28s ease, transform .28s cubic-bezier(.2, .8, .2, 1);
+}
+.ed-toast.is-in { opacity: 1; transform: none; }
+
+/* ============================================================================
+   PER-CARD / DETAIL PENCIL  (injected into #app for editors only)
+   ========================================================================== */
+.edit-pencil {
+  width: 32px; height: 32px; border-radius: var(--pill);
+  display: inline-grid; place-items: center; font-size: .92rem;
+  background: var(--surface); color: var(--paprika);
+  border: 1.5px solid color-mix(in srgb, var(--paprika) 26%, #fff);
+  box-shadow: var(--shadow-sm);
+  transition: transform .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.edit-pencil:hover { transform: translateY(-1px) scale(1.08); background: var(--surface-2); box-shadow: var(--shadow); }
+.place-card { position: relative; }
+.place-card .edit-pencil {
+  position: absolute; z-index: 4; top: 6px; inset-inline-start: 6px;
+  background: rgba(255, 255, 255, .92); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+}
+.section-title .edit-pencil { position: static; margin-inline-start: 8px; font-size: .82rem; width: 30px; height: 30px; }
+
+/* ============================================================================
+   RESPONSIVE — centered dialog on wider screens
+   ========================================================================== */
+@media (min-width: 640px) {
+  .ed-scrim { align-items: center; padding: 24px; }
+  .ed-modal { border-radius: var(--r-xl); max-height: 88dvh; transform: translateY(18px) scale(.97); }
+  .ed-scrim.is-in .ed-modal { transform: none; }
+  .ed-scrim.is-out .ed-modal { transform: translateY(18px) scale(.97); }
+}
+
+/* FAB clears the desktop top-nav layout (no bottom tab-bar there) */
+@media (min-width: 960px) {
+  .ed-fab__wrap { bottom: 28px; inset-inline-end: 28px; }
+  .ed-toasts { bottom: 32px; }
+}
+
+/* ---------- Reduced motion ---------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  #edit-layer *, .edit-pencil { transition: none !important; animation: none !important; }
+  .ed-modal, .ed-confirm { transform: none !important; }
+}
