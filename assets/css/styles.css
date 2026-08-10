@@ -148,6 +148,22 @@ body::before {
 .authbtn .lbl { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 600px) { .authbtn { padding: 6px; } .authbtn .lbl { display: none; } }
 
+/* cloud-unavailable warning (editors only) */
+.cloudbanner {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: 14px 0 4px; padding: 12px 14px;
+  border-radius: var(--r); border: 1px solid color-mix(in srgb, var(--gold) 40%, #fff);
+  background: color-mix(in srgb, var(--gold) 14%, #fff); box-shadow: var(--shadow-sm);
+  font-size: .88rem; line-height: 1.45;
+}
+.cloudbanner__ico { font-size: 1.15rem; line-height: 1.2; }
+.cloudbanner__txt { flex: 1; }
+.cloudbanner__txt small { display: block; margin-top: 3px; color: var(--ink-soft); font-size: .82rem; }
+.cloudbanner__x {
+  font-size: 1.2rem; line-height: 1; color: var(--ink-faint); padding: 2px 6px; border-radius: 8px;
+}
+.cloudbanner__x:hover { color: var(--ink); background: rgba(0,0,0,.05); }
+
 .container { width: min(100% - 28px, var(--maxw)); margin-inline: auto; }
 
 .screen { padding: 20px 0 40px; animation: screen-in .42s cubic-bezier(.2,.7,.2,1); }

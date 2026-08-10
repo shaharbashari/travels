@@ -48,6 +48,26 @@ function wireChrome() {
   app.querySelectorAll('[data-auth]').forEach((b) => {
     b.addEventListener('click', () => (b.dataset.auth === 'in' ? auth.signIn() : auth.signOut()));
   });
+  app.querySelectorAll('[data-dismiss-banner]').forEach((b) => {
+    b.addEventListener('click', () => { _bannerDismissed = true; b.closest('.cloudbanner')?.remove(); });
+  });
+}
+
+// באנר אזהרה: הענן מוגדר אך לא זמין → שינויים נשמרים מקומית בלבד
+let _bannerDismissed = false;
+function cloudBanner() {
+  if (_bannerDismissed || !auth.canEdit()) return '';
+  const st = store.cloudStatus();
+  if (!st.configured || !st.broken) return '';
+  return `
+    <div class="cloudbanner">
+      <span class="cloudbanner__ico">⚠️</span>
+      <div class="cloudbanner__txt">
+        <b>השמירה בענן לא זמינה</b> — השינויים נשמרים במכשיר הזה בלבד ולא יופיעו למשתמשים אחרים.
+        <small>יש ליצור את מסד הנתונים ב-Firebase (Firestore Database → Create) ולפרסם את חוקי האבטחה.</small>
+      </div>
+      <button class="cloudbanner__x" data-dismiss-banner aria-label="סגירה">×</button>
+    </div>`;
 }
 
 // ---- כותרות ------------------------------------------------------------
@@ -94,7 +114,7 @@ function keepScroll(key) {
 
 function renderTrips() {
   const ctx = { tours: store.getTours(), config, canEdit: auth.canEdit() };
-  app.innerHTML = topbarTrips() + `<main class="container">${trips.render(ctx)}</main>`;
+  app.innerHTML = topbarTrips() + `<main class="container">${cloudBanner()}${trips.render(ctx)}</main>`;
   trips.mount?.(ctx, app);
   wireChrome();
   edit.refresh?.({ route: { name: 'trips' }, canEdit: auth.canEdit() });
@@ -120,7 +140,7 @@ function renderTour(route) {
   app.innerHTML =
     topbarTour(tour) +
     tabbar(tour, activeTab) +
-    `<main class="container"><div class="screen">${view.render(ctx)}</div></main>`;
+    `<main class="container"><div class="screen">${cloudBanner()}${view.render(ctx)}</div></main>`;
 
   view.mount?.(ctx, app);
   wireChrome();

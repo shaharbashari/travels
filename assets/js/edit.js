@@ -296,7 +296,13 @@ function closeConfirm() {
   setTimeout(() => c.remove(), 150);
 }
 
-function afterSave(msg) { closeModal(); toast(msg || 'נשמר ✓'); }
+function afterSave(msg) {
+  closeModal();
+  // אם הענן מוגדר אך לא זמין — השמירה ירדה ל-localStorage; לא מציגים "נשמר ✓" מטעה
+  const st = store.cloudStatus?.();
+  if (st && st.configured && st.broken) toast('נשמר במכשיר זה בלבד — הענן לא זמין ⚠️');
+  else toast(msg || 'נשמר ✓');
+}
 
 function toast(msg) {
   ensureLayer();

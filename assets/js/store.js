@@ -15,11 +15,64 @@ let effective = [];            // מערך אפקטיבי לאחר מיזוג se
 const subs = new Set();
 
 let _fs = null, _db = null;
+let cloudBroken = false;       // הענן מוגדר אך לא זמין (למשל: Firestore לא נוצר / חוקים חוסמים)
+let lastError = null;
 
 export { configured };
-export function isCloud() { return !!(configured && _db && _fs); }
+/** האם שמירה בפועל הולכת לענן (ולא ל-localStorage). */
+export function isCloud() { return !!(configured && _db && _fs && !cloudBroken); }
+/** מצב החיבור לענן — לשימוש ב-UI (באנר אזהרה). */
+export function cloudStatus() {
+  return { configured, connected: isCloud(), broken: cloudBroken, error: lastError };
+}
 export function onChange(fn) { subs.add(fn); return () => subs.delete(fn); }
 function notify() { computeEffective(); subs.forEach((f) => { try { f(); } catch {} }); }
+
+/** Firestore דוחה ערכי undefined — מנקים עומק מלא לפני כתיבה. */
+function sanitize(v) {
+  if (Array.isArray(v)) return v.filter((x) => x !== undefined).map(sanitize);
+  if (v && typeof v === 'object') {
+    const out = {};
+    for (const [k, val] of Object.entries(v)) if (val !== undefined) out[k] = sanitize(val);
+    return out;
+  }
+  return v;
+}
+
+/**
+ * ה-SDK של Firestore ממשיך לנסות לנצח כשאין גישה למסד (למשל: לא נוצר / אין רשת),
+ * ואז ההבטחה לעולם לא נפתרת והממשק "נתקע" והשינוי נעלם.
+ * לכן כל כתיבה מוגבלת בזמן — ואם לא הושלמה, שומרים מקומית.
+ */
+const WRITE_TIMEOUT_MS = 7000;
+function withTimeout(promise, ms = WRITE_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      const e = new Error('cloud-write-timeout');
+      e.code = 'timeout';
+      reject(e);
+    }, ms);
+    promise.then(
+      (v) => { if (!done) { done = true; clearTimeout(timer); resolve(v); } },
+      (e) => { if (!done) { done = true; clearTimeout(timer); reject(e); } },
+    );
+  });
+}
+
+/** נפילה חיננית: אם הכתיבה לענן נכשלה — שומרים מקומית כדי לא לאבד את השינוי. */
+function degradeToLocal(e, mutate) {
+  cloudBroken = true;
+  lastError = (e && (e.code || e.message)) ? String(e.code || e.message) : String(e);
+  console.warn('[store] cloud write failed — saving locally instead.', e);
+  loadLocal();
+  mutate();
+  saveLocal();
+  notify();
+  return { ok: true, backend: 'local', degraded: true, error: lastError };
+}
 
 function assignIds(tour) {
   (tour.places || []).forEach((p) => { if (!p.id) p.id = pid(p.name || p.he || String(Math.random())); });
@@ -62,10 +115,39 @@ export async function loadAll() {
       try {
         r.fs.onSnapshot(
           r.fs.collection(r.db, 'tours'),
-          (snap) => { overlay.tours = {}; snap.forEach((d) => { overlay.tours[d.id] = d.data(); }); notify(); },
-          (err) => { console.warn('[store] snapshot error', err); notify(); },
+          (snap) => {
+            cloudBroken = false; lastError = null;
+            overlay.tours = {};
+            snap.forEach((d) => { overlay.tours[d.id] = d.data(); });
+            notify();
+          },
+          (err) => {
+            // אין גישה ל-Firestore (למשל: מסד לא נוצר / חוקים חוסמים) → עוברים למצב מקומי
+            cloudBroken = true;
+            lastError = String(err?.code || err?.message || err);
+            console.warn('[store] Firestore unavailable — using local edits.', err);
+            loadLocal();
+            notify();
+          },
         );
-      } catch (e) { console.warn('[store] subscribe failed', e); }
+      } catch (e) {
+        cloudBroken = true; lastError = String(e?.message || e);
+        console.warn('[store] subscribe failed', e);
+        loadLocal();
+      }
+      // בדיקת בריאות ברקע — לא חוסמת את הרינדור הראשון!
+      // אם אין תשובה מהשרת תוך זמן קצר (למשל: מסד הנתונים לא נוצר) מסמנים
+      // שהענן לא זמין, טוענים עריכות מקומיות ומרעננים את המסך.
+      withTimeout(r.fs.getDocs(r.fs.collection(r.db, 'tours')), 8000).then(
+        () => { cloudBroken = false; lastError = null; },
+        (e) => {
+          cloudBroken = true;
+          lastError = String(e?.code || e?.message || e);
+          console.warn('[store] Firestore not reachable — local mode.', lastError);
+          loadLocal();
+          notify();
+        },
+      );
       computeEffective();
       return;
     }
@@ -78,8 +160,12 @@ export async function loadAll() {
 export async function saveTour(tour) {
   tour = assignIds(clone(tour));
   if (isCloud()) {
-    await _fs.setDoc(_fs.doc(_db, 'tours', tour.id), tour);
-    return { ok: true, backend: 'cloud' };
+    try {
+      await withTimeout(_fs.setDoc(_fs.doc(_db, 'tours', tour.id), sanitize(tour)));
+      return { ok: true, backend: 'cloud' };
+    } catch (e) {
+      return degradeToLocal(e, () => { overlay.tours[tour.id] = tour; });
+    }
   }
   overlay.tours[tour.id] = tour; saveLocal(); notify();
   return { ok: true, backend: 'local' };
@@ -87,12 +173,16 @@ export async function saveTour(tour) {
 
 export async function deleteTour(id) {
   if (isCloud()) {
-    // tombstone so seeded tours stay hidden too
-    await _fs.setDoc(_fs.doc(_db, 'tours', id), { _deleted: true, id });
-    return { ok: true };
+    try {
+      // tombstone so seeded tours stay hidden too
+      await withTimeout(_fs.setDoc(_fs.doc(_db, 'tours', id), { _deleted: true, id }));
+      return { ok: true, backend: 'cloud' };
+    } catch (e) {
+      return degradeToLocal(e, () => { overlay.tours[id] = { _deleted: true }; });
+    }
   }
   overlay.tours[id] = { _deleted: true }; saveLocal(); notify();
-  return { ok: true };
+  return { ok: true, backend: 'local' };
 }
 
 export async function addTour(tour) { return saveTour(tour); }
