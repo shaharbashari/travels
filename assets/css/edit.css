@@ -186,6 +186,43 @@
 .ed-imgs__empty { color: var(--ink-faint); }
 .ed-imgs__hint { margin-top: 6px; font-size: .74rem; color: var(--ink-faint); text-align: center; }
 
+/* ---------- Travel: mode picker + embedded section ---------------------- */
+.ed-travel { display: flex; flex-direction: column; gap: 12px; }
+.ed-travel__lead { font-weight: 700; color: var(--ink-soft); }
+.ed-travel__rows { display: flex; flex-direction: column; gap: 12px; transition: opacity .15s ease; }
+.ed-travel__rows.is-disabled { opacity: .45; }
+
+.ed-modes { display: flex; flex-wrap: wrap; gap: 8px; }
+.ed-mode {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 14px; border-radius: var(--pill); font-weight: 700; font-size: .9rem;
+  background: var(--surface-2); color: var(--ink);
+  border: 1.5px solid var(--line-strong); box-shadow: var(--shadow-sm);
+  transition: transform .14s ease, background .14s ease, color .14s ease, border-color .14s ease;
+}
+.ed-mode:hover { transform: translateY(-1px); background: var(--surface); }
+.ed-mode.is-on { background: var(--grad-danube); color: #fff; border-color: transparent; box-shadow: var(--shadow); }
+.ed-mode__emoji { font-size: 1.15rem; line-height: 1; }
+
+.ed-travel-embed {
+  border: 1.5px dashed color-mix(in srgb, var(--danube) 40%, #fff);
+  border-radius: var(--r); background: var(--surface-2); overflow: hidden;
+}
+.ed-travel-embed__summary {
+  cursor: pointer; list-style: none; display: flex; align-items: center; gap: 9px;
+  justify-content: space-between;
+  padding: 12px 14px; font-weight: 700; color: var(--danube-deep);
+}
+.ed-travel-embed__summary::-webkit-details-marker { display: none; }
+.ed-travel-embed__summary::after {
+  content: '▾'; color: var(--ink-faint);
+  transition: transform .18s ease;
+}
+.ed-travel-embed[open] .ed-travel-embed__summary::after { transform: rotate(180deg); }
+.ed-travel-embed[open] .ed-travel-embed__summary { border-bottom: 1px dashed color-mix(in srgb, var(--danube) 30%, #fff); }
+.ed-travel-embed__cur { font-size: .8rem; font-weight: 600; color: var(--ink-faint); }
+.ed-travel-embed__body { padding: 14px; display: flex; flex-direction: column; gap: 12px; background: var(--surface); }
+
 /* ---------- Buttons ------------------------------------------------------ */
 .ed-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;

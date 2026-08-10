@@ -11,7 +11,7 @@
 // ============================================================================
 import * as store from './store.js';
 import * as auth from './auth.js';
-import { CATEGORIES, iconFor, pid, slugify } from './util.js';
+import { CATEGORIES, iconFor, pid, slugify, PERIODS, TRAVEL_MODES, travelLabel, fmtWeekday, fmtDateShort } from './util.js';
 
 // ---- Wikimedia Commons (client-side, CORS-friendly) --------------------------
 const COMMONS = (q) =>
@@ -564,6 +564,321 @@ function openDayForm(tour) {
 }
 
 // =============================================================================
+//  day-item helpers  (activities inside a day's timeline)
+// =============================================================================
+function normTime(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  const m = s.match(/^(\d{1,2})\s*[:.]?\s*(\d{2})$/);
+  if (!m) return s.slice(0, 5);
+  const h = Math.min(23, parseInt(m[1], 10));
+  const mi = Math.min(59, parseInt(m[2], 10));
+  return String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
+}
+
+function resolveDay(tourId, dayIndex) {
+  const tour = store.getTour(tourId);
+  if (!tour) return null;
+  const day = (tour.days || []).find((d) => Number(d.index) === Number(dayIndex));
+  if (!day) return null;
+  return { tour, day };
+}
+
+// Shared travel controls (mode chips + duration/line/note). Used by the travel
+// editor and, embedded, inside the activity editor. values() → travel obj | null.
+function buildTravelControls(travel, opts = {}) {
+  const t = travel || {};
+  const allowNone = opts.allowNone !== false;
+  let selected = TRAVEL_MODES[t.mode] ? t.mode
+    : (TRAVEL_MODES[opts.defaultMode] ? opts.defaultMode : null);
+
+  const chips = el('div', { class: 'ed-modes', role: 'radiogroup', 'aria-label': 'אמצעי הגעה' });
+  const btns = {};
+  Object.keys(TRAVEL_MODES).forEach((key) => {
+    const m = TRAVEL_MODES[key];
+    const b = el('button', {
+      type: 'button', class: 'ed-mode', role: 'radio', 'data-mode': key,
+      onclick: () => setMode(selected === key && allowNone ? null : key),
+    }, [
+      el('span', { class: 'ed-mode__emoji', 'aria-hidden': 'true' }, [m.emoji]),
+      el('span', {}, [m.he]),
+    ]);
+    btns[key] = b;
+    chips.appendChild(b);
+  });
+
+  const durationInput = el('input', { class: 'ed-input', type: 'text', value: t.duration || '', placeholder: 'למשל: 12 דק׳' });
+  const lineInput = el('input', { class: 'ed-input', type: 'text', value: t.line || '', placeholder: 'למשל: 2 / M1', dir: 'ltr' });
+  const noteInput = el('input', { class: 'ed-input', type: 'text', value: t.note || '', placeholder: 'הערה (אופציונלי)' });
+  const rows = el('div', { class: 'ed-travel__rows' }, [
+    row2(field('משך', durationInput), field('קו', lineInput)),
+    field('הערה', noteInput),
+  ]);
+
+  function updateEnabled() {
+    const dis = selected == null;
+    [durationInput, lineInput, noteInput].forEach((i) => { i.disabled = dis; });
+    rows.classList.toggle('is-disabled', dis);
+  }
+  function setMode(k) {
+    selected = k;
+    Object.keys(btns).forEach((key) => {
+      const on = key === selected;
+      btns[key].classList.toggle('is-on', on);
+      btns[key].setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+    updateEnabled();
+  }
+  setMode(selected);
+
+  const wrap = el('div', { class: 'ed-travel' }, [
+    el('div', { class: 'ed-label' }, ['אמצעי הגעה']),
+    chips,
+    rows,
+  ]);
+
+  return {
+    el: wrap,
+    values: () => {
+      if (selected == null) return null;
+      const out = { mode: selected };
+      const d = durationInput.value.trim(); if (d) out.duration = d;
+      const l = lineInput.value.trim(); if (l) out.line = l;
+      const n = noteInput.value.trim(); if (n) out.note = n;
+      return out;
+    },
+  };
+}
+
+// =============================================================================
+//  ACTIVITY editor (add / edit a day item)   ← public: openDayItemEditor
+// =============================================================================
+export function openDayItemEditor(opts) {
+  opts = opts || {};
+  const { tourId, dayIndex } = opts;
+  const itemIndex = opts.itemIndex == null ? null : opts.itemIndex;
+  const period0 = opts.period || '';
+  const at = opts.at == null ? null : opts.at;
+
+  if (!auth.canEdit()) { console.warn('[edit] openDayItemEditor: editing not allowed'); return; }
+  const ctx = resolveDay(tourId, dayIndex);
+  if (!ctx) { console.warn('[edit] openDayItemEditor: invalid tour/day', tourId, dayIndex); return; }
+  const { tour, day } = ctx;
+  const isEdit = itemIndex != null;
+  let item = {};
+  if (isEdit) {
+    const items = day.items || [];
+    if (itemIndex < 0 || itemIndex >= items.length) { console.warn('[edit] openDayItemEditor: invalid itemIndex', itemIndex); return; }
+    item = items[itemIndex] || {};
+  }
+  const origDay = Number(dayIndex);
+
+  const titleInput = el('input', { class: 'ed-input', type: 'text', value: item.title || '', placeholder: 'למשל: ארוחת בוקר במאפייה', required: true });
+  titleInput.addEventListener('input', () => titleInput.classList.remove('ed-input--err'));
+  const descInput = el('textarea', { class: 'ed-textarea', rows: '2', placeholder: 'תיאור קצר (אופציונלי)' }, [item.desc || '']);
+
+  const emojiInput = el('input', { class: 'ed-input ed-input--emoji', type: 'text', value: item.emoji || iconFor(item.title || ''), maxlength: '8', 'aria-label': 'אימוג׳י' });
+  let emojiTouched = !!item.emoji;
+  emojiInput.addEventListener('input', () => { emojiTouched = true; });
+  titleInput.addEventListener('input', () => { if (!emojiTouched) emojiInput.value = iconFor(titleInput.value); });
+
+  const timeInput = el('input', { class: 'ed-input', type: 'time', value: normTime(item.time), step: '60' });
+
+  const periodSelect = el('select', { class: 'ed-select' });
+  periodSelect.appendChild(el('option', { value: '' }, ['— חלק היום —']));
+  const curPeriod = item.period != null && item.period !== '' ? item.period : period0;
+  PERIODS.forEach((p) => {
+    const o = el('option', { value: p }, [p]);
+    if (p === curPeriod) o.selected = true;
+    periodSelect.appendChild(o);
+  });
+
+  const daySelect = el('select', { class: 'ed-select' });
+  (tour.days || []).forEach((d) => {
+    const wk = fmtWeekday(d.date); const dt = fmtDateShort(d.date);
+    const label = `יום ${d.index}` + (wk || dt ? ` · ${[wk, dt].filter(Boolean).join(' ')}` : '');
+    const o = el('option', { value: String(d.index) }, [label]);
+    if (Number(d.index) === origDay) o.selected = true;
+    daySelect.appendChild(o);
+  });
+
+  const placeSelect = el('select', { class: 'ed-select' });
+  placeSelect.appendChild(el('option', { value: '' }, ['— ללא מקום מקושר —']));
+  const curPlace = item.place || '';
+  const placeNames = (tour.places || []).map((p) => p.name).filter(Boolean);
+  let hasCur = false;
+  placeNames.forEach((n) => {
+    const o = el('option', { value: n }, [n]);
+    if (n === curPlace) { o.selected = true; hasCur = true; }
+    placeSelect.appendChild(o);
+  });
+  if (curPlace && !hasCur) {
+    const o = el('option', { value: curPlace }, [curPlace]);
+    o.selected = true;
+    placeSelect.appendChild(o);
+  }
+
+  const imgInput = el('input', { class: 'ed-input', type: 'url', value: item.img || '', placeholder: 'https://…', dir: 'ltr' });
+  const imgsBox = el('div', { class: 'ed-imgs' });
+  const suggestBtn = el('button', {
+    type: 'button', class: 'ed-btn ed-btn--ghost ed-btn--sm',
+    onclick: () => {
+      const city = (tour.destination && tour.destination.city) || '';
+      const q = `${titleInput.value.trim()} ${city}`.trim();
+      if (q) runSuggest(imgsBox, q, (im) => { imgInput.value = im.thumb; });
+    },
+  }, ['🖼️ הצע תמונה']);
+
+  const travelControls = buildTravelControls(item.travel, { allowNone: true });
+  const summaryKids = [el('span', {}, ['🚕 נסיעה לפעילות הזו'])];
+  if (item.travel) summaryKids.push(el('span', { class: 'ed-travel-embed__cur' }, [travelLabel(item.travel)]));
+  const details = el('details', { class: 'ed-travel-embed' }, [
+    el('summary', { class: 'ed-travel-embed__summary' }, summaryKids),
+    el('div', { class: 'ed-travel-embed__body' }, [
+      el('div', { class: 'ed-hint' }, ['איך מגיעים לפעילות הזו מהקודמת בציר הזמן']),
+      travelControls.el,
+    ]),
+  ]);
+  if (item.travel) details.setAttribute('open', '');
+
+  const body = el('div', { class: 'ed-form' }, [
+    field('כותרת הפעילות', titleInput, 'שדה חובה'),
+    field('תיאור', descInput),
+    row2(field('אימוג׳י', emojiInput, 'נבחר אוטומטית — ניתן לשנות'), field('שעה', timeInput)),
+    row2(field('חלק היום', periodSelect), field('יום במסלול', daySelect)),
+    field('מקום מקושר', placeSelect, 'הכרטיס יקשר לעמוד המקום'),
+    field('תמונה (URL)', el('div', { class: 'ed-inline' }, [imgInput, suggestBtn]), 'אופציונלי'),
+    imgsBox,
+    details,
+  ]);
+
+  const deleteBtn = isEdit ? el('button', {
+    type: 'button', class: 'ed-btn ed-btn--danger ed-btn--pushstart',
+    onclick: () => openConfirm({
+      message: `למחוק את "${item.title || 'הפעילות'}"?`,
+      confirmLabel: 'מחיקה', danger: true,
+      onConfirm: async () => { await store.removeDayItem(tourId, origDay, itemIndex); afterSave('נמחק ✓'); },
+    }),
+  }, ['🗑️ מחיקה']) : null;
+
+  openModal({
+    title: isEdit ? 'עריכת פעילות' : 'פעילות חדשה',
+    body,
+    submitLabel: isEdit ? 'שמירת שינויים' : 'הוספת פעילות',
+    extraLeft: deleteBtn,
+    onSubmit: async () => {
+      const title = titleInput.value.trim();
+      if (!title) { titleInput.focus(); titleInput.classList.add('ed-input--err'); return; }
+      const chosenDay = Number(daySelect.value);
+      const travel = travelControls.values();
+      const out = {
+        title,
+        desc: descInput.value.trim(),
+        emoji: emojiInput.value.trim() || iconFor(title),
+        period: periodSelect.value,
+        time: normTime(timeInput.value),
+        place: placeSelect.value,
+        img: imgInput.value.trim(),
+      };
+      if (travel) out.travel = travel;
+      else if (isEdit) out.travel = null;
+
+      if (isEdit && chosenDay !== origDay) {
+        await store.moveDayItem(tourId, origDay, itemIndex, chosenDay, null, out);
+      } else if (isEdit) {
+        await store.upsertDayItem(tourId, origDay, out, itemIndex);
+      } else {
+        const atPos = chosenDay === origDay ? at : null;
+        await store.upsertDayItem(tourId, chosenDay, out, null, atPos);
+      }
+      afterSave('נשמר ✓');
+    },
+  });
+}
+
+// =============================================================================
+//  TRAVEL editor (the leg leading TO an activity)   ← public: openTravelEditor
+// =============================================================================
+export function openTravelEditor(opts) {
+  opts = opts || {};
+  const { tourId, dayIndex, itemIndex } = opts;
+  if (!auth.canEdit()) { console.warn('[edit] openTravelEditor: editing not allowed'); return; }
+  const ctx = resolveDay(tourId, dayIndex);
+  if (!ctx) { console.warn('[edit] openTravelEditor: invalid tour/day', tourId, dayIndex); return; }
+  const items = ctx.day.items || [];
+  if (itemIndex == null || itemIndex < 0 || itemIndex >= items.length) {
+    console.warn('[edit] openTravelEditor: invalid itemIndex', itemIndex); return;
+  }
+  const item = items[itemIndex];
+  const controls = buildTravelControls(item.travel, { defaultMode: item.travel ? item.travel.mode : 'walk' });
+
+  const body = el('div', { class: 'ed-form' }, [
+    el('div', { class: 'ed-travel__lead' }, [`איך מגיעים אל: ${item.title || 'הפעילות'}`]),
+    controls.el,
+  ]);
+
+  const removeBtn = el('button', {
+    type: 'button', class: 'ed-btn ed-btn--danger ed-btn--pushstart',
+    onclick: async () => { await store.upsertDayItem(tourId, dayIndex, { travel: null }, itemIndex); afterSave('הנסיעה הוסרה ✓'); },
+  }, ['הסר נסיעה']);
+
+  openModal({
+    title: 'נסיעה לפעילות',
+    body,
+    submitLabel: 'שמירה',
+    extraLeft: removeBtn,
+    onSubmit: async () => {
+      await store.upsertDayItem(tourId, dayIndex, { travel: controls.values() }, itemIndex);
+      afterSave('נשמר ✓');
+    },
+  });
+}
+
+// =============================================================================
+//  DAY editor (edit an existing day's meta)   ← public: openDayEditor
+// =============================================================================
+export function openDayEditor(opts) {
+  opts = opts || {};
+  const { tourId, dayIndex } = opts;
+  if (!auth.canEdit()) { console.warn('[edit] openDayEditor: editing not allowed'); return; }
+  const ctx = resolveDay(tourId, dayIndex);
+  if (!ctx) { console.warn('[edit] openDayEditor: invalid tour/day', tourId, dayIndex); return; }
+  const day = ctx.day;
+
+  const titleInput = el('input', { class: 'ed-input', type: 'text', value: day.title || '', placeholder: 'כותרת היום', required: true });
+  titleInput.addEventListener('input', () => titleInput.classList.remove('ed-input--err'));
+  const subInput = el('input', { class: 'ed-input', type: 'text', value: day.subtitle || '', placeholder: 'תת-כותרת (אופציונלי)' });
+  const dateInput = el('input', { class: 'ed-input', type: 'date', value: day.date || '' });
+  const lodgingInput = el('input', { class: 'ed-input', type: 'text', value: day.lodging || '', placeholder: 'למשל: מלון בעיר העתיקה' });
+  const transportInput = el('input', { class: 'ed-input', type: 'text', value: Array.isArray(day.transport) ? day.transport.join(', ') : (day.transport || ''), placeholder: 'למשל: מטרו, ברגל' });
+
+  const body = el('div', { class: 'ed-form' }, [
+    field('כותרת', titleInput, 'שדה חובה'),
+    field('תת-כותרת', subInput),
+    row2(field('תאריך', dateInput), field('לינה', lodgingInput)),
+    field('תחבורה', transportInput, 'אמצעי תחבורה מופרדים בפסיק'),
+  ]);
+
+  openModal({
+    title: 'עריכת היום',
+    body,
+    submitLabel: 'שמירת שינויים',
+    onSubmit: async () => {
+      const title = titleInput.value.trim();
+      if (!title) { titleInput.focus(); titleInput.classList.add('ed-input--err'); return; }
+      await store.updateDay(tourId, dayIndex, {
+        title,
+        subtitle: subInput.value.trim(),
+        date: dateInput.value || '',
+        lodging: lodgingInput.value.trim(),
+        transport: transportInput.value.split(',').map((s) => s.trim()).filter(Boolean),
+      });
+      afterSave('נשמר ✓');
+    },
+  });
+}
+
+// =============================================================================
 //  Floating Action Button (context-aware)
 // =============================================================================
 function fabActions() {
@@ -573,11 +888,24 @@ function fabActions() {
     return [{ emoji: '➕', label: 'טיול חדש', fn: () => openTripForm(null) }];
   }
   if (r.name === 'tour' && ctx.tour) {
+    const tour = ctx.tour;
+    const days = Array.isArray(tour.days) ? tour.days : [];
+    const onDays = r.tab === 'days';
+    const curDay = (onDays && r.param != null && days.some((d) => Number(d.index) === Number(r.param)))
+      ? Number(r.param)
+      : (days[0] ? days[0].index : 1);
+    const addActivity = { emoji: '➕', label: 'פעילות למסלול', fn: () => openDayItemEditor({ tourId: tour.id, dayIndex: curDay, itemIndex: null }) };
+
     const acts = [];
-    if (r.tab === 'place' && ctx.place) acts.push({ emoji: '✏️', label: 'עריכת מקום', fn: () => openPlaceForm(ctx.tour, ctx.place) });
-    acts.push({ emoji: '➕', label: 'מקום חדש', fn: () => openPlaceForm(ctx.tour, null) });
-    acts.push({ emoji: '🗓️', label: 'יום למסלול', fn: () => openDayForm(ctx.tour) });
-    acts.push({ emoji: '✏️', label: 'עריכת הטיול', fn: () => openTripForm(ctx.tour) });
+    if (r.tab === 'place' && ctx.place) acts.push({ emoji: '✏️', label: 'עריכת מקום', fn: () => openPlaceForm(tour, ctx.place) });
+    if (onDays) {
+      acts.push(addActivity);
+      acts.push({ emoji: '✏️', label: 'עריכת היום', fn: () => openDayEditor({ tourId: tour.id, dayIndex: curDay }) });
+    }
+    acts.push({ emoji: '➕', label: 'מקום חדש', fn: () => openPlaceForm(tour, null) });
+    if (!onDays) acts.push(addActivity);
+    acts.push({ emoji: '🗓️', label: 'יום למסלול', fn: () => openDayForm(tour) });
+    acts.push({ emoji: '✏️', label: 'עריכת הטיול', fn: () => openTripForm(tour) });
     return acts;
   }
   return [];

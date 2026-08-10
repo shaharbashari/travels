@@ -188,6 +188,7 @@ const tourTemplate = {
   // ---- מסלול יומי (חובה) --------------------------------------------------
   // period: 'בוקר' | 'צהריים' | 'אחר הצהריים' | 'ערב'  (מקבץ את הפריטים בציר הזמן)
   // time: אופציונלי ('08:35'); place: שם שמקשר לכרטיס ב"מה עושים"
+  // travel: הדרך אל הפריט מהפריט הקודם; mode: walk | metro | tram | bus | taxi | car | boat | train | funicular | bike
   days: [
     {
       index: 1, date: '2027-01-01',
@@ -195,6 +196,7 @@ const tourTemplate = {
       transport: ['ברגל'], lodging: 'שם המלון',
       items: [
         { period: 'בוקר', time: '', emoji: '🥐', title: 'פעילות', desc: 'פרטים', place: '' },
+        { period: 'בוקר', time: '10:00', emoji: '📍', title: 'הפעילות הבאה', desc: 'פרטים', travel: { mode: 'walk', duration: '10 דק׳', note: 'הליכה נעימה דרך המרכז' }, place: '' },
       ],
     },
   ],

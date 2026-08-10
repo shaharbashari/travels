@@ -1,4 +1,300 @@
 /* =============================================================================
    days.css — ציר הזמן של המסלול: מקטעי נסיעה, גרירה ושחרור, ועריכה מהירה.
    מנוהל ע"י assets/js/views/days.js. נטען מ-index.html.
+   כל הצבעים/רדיוסים/צללים מטוקנים של styles.css. RTL עם תכונות לוגיות.
    ========================================================================== */
+
+/* =============================================================================
+   מקטעי נסיעה (item.travel) — מחבר על הציר בין פעילויות עוקבות.
+   ========================================================================== */
+.tl-travel {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  gap: 12px;
+  align-items: center;
+  margin: -2px 0 8px;
+}
+.tl-travel__rail {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+}
+.tl-travel__rail::before {
+  content: "";
+  position: absolute;
+  inset-block: -8px 0;
+  inset-inline-start: calc(50% - 1px);
+  width: 2px;
+  background: repeating-linear-gradient(var(--line-strong) 0 4px, transparent 4px 9px);
+  z-index: 0;
+}
+.tl-travel__pip {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px dashed var(--line-strong);
+  box-shadow: var(--shadow-sm);
+  font-size: .78rem;
+}
+.tl-travel__main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+}
+.tl-travel__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: var(--pill);
+  background: color-mix(in srgb, var(--danube) 9%, var(--surface));
+  border: 1px dashed color-mix(in srgb, var(--danube) 38%, var(--line));
+  color: var(--danube-deep);
+  font-weight: 700;
+  font-size: .8rem;
+  line-height: 1.35;
+}
+.tl-travel__note { color: var(--ink-soft); font-size: .76rem; }
+
+.tl-travel.is-editable { cursor: pointer; }
+.tl-travel.is-editable:hover .tl-travel__chip { border-style: solid; box-shadow: var(--shadow-sm); }
+.tl-travel:focus-visible { outline: none; }
+.tl-travel:focus-visible .tl-travel__chip { box-shadow: var(--ring); border-style: solid; }
+
+/* הוספת נסיעה — עדין, מתחזק במעבר עכבר / תמיד גלוי במגע. */
+.tl-travel--add { opacity: .55; }
+.tl-travel--add:hover, .tl-travel--add:focus-visible { opacity: 1; }
+.tl-travel__pip--add { color: var(--ink-faint); }
+.tl-travel__chip--add {
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  color: var(--ink-soft);
+}
+.tl-travel--add:hover .tl-travel__chip--add,
+.tl-travel--add:focus-visible .tl-travel__chip--add {
+  color: var(--danube-deep);
+  border-color: color-mix(in srgb, var(--danube) 40%, var(--line));
+}
+
+/* =============================================================================
+   עריכה מהירה — ידית גרירה, כפתורי עריכה/מחיקה, כפתורי הוספה, רמזים.
+   הכול קיים ב-DOM רק במצב עריכה (.day-layout.is-editable).
+   ========================================================================== */
+.day-layout.is-editable .tl-card { position: relative; }
+
+.tl-handle {
+  flex: 0 0 auto;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  margin-inline-start: -4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 1.15rem;
+  line-height: 1;
+  border-radius: var(--r-sm);
+  cursor: grab;
+  touch-action: none; /* גרירה מיידית מהידית, ללא גלילה */
+}
+.tl-handle:hover { color: var(--ink-soft); background: var(--surface-2); }
+.tl-handle:active { cursor: grabbing; }
+.tl-handle:focus-visible { outline: none; box-shadow: var(--ring); color: var(--ink); }
+
+.tl-card__ops {
+  position: absolute;
+  inset-block-start: 6px;
+  inset-inline-end: 6px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity .14s ease, transform .14s ease;
+}
+.tl-card:hover .tl-card__ops,
+.tl-card:focus-within .tl-card__ops { opacity: 1; transform: none; }
+.tl-op {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: var(--pill);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  font-size: .82rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
+}
+.tl-op:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+.tl-op:focus-visible { outline: none; box-shadow: var(--ring); }
+.tl-op--danger:hover { border-color: color-mix(in srgb, var(--paprika) 42%, var(--line)); }
+
+/* "➕ פעילות" בסוף כל חלק-יום — מיושר עם הכרטיסים (58 מסילה + 12 מרווח). */
+.tl-group__add { margin: 0 0 12px; padding-inline-start: 70px; }
+.tl-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--pill);
+  border: 1px dashed var(--line-strong);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: .84rem;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform .14s ease, box-shadow .14s ease, color .14s ease, border-color .14s ease;
+}
+.tl-add:hover {
+  transform: translateY(-1px);
+  color: var(--paprika);
+  border-color: color-mix(in srgb, var(--paprika) 38%, var(--line));
+  box-shadow: var(--shadow);
+}
+.tl-add:focus-visible { outline: none; box-shadow: var(--ring); }
+
+/* יעד שחרור ריק (חלק-יום ללא פעילויות, במצב עריכה). */
+.tl-empty {
+  margin: 2px 0 10px;
+  padding: 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r);
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+  color: var(--ink-faint);
+  font-weight: 600;
+  font-size: .86rem;
+  text-align: center;
+}
+
+.day-head__edit {
+  position: absolute;
+  inset-block-start: 14px;
+  inset-inline-end: 16px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: var(--pill);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .75);
+  box-shadow: var(--shadow-sm);
+  font-size: .9rem;
+  cursor: pointer;
+  transition: transform .14s ease, box-shadow .14s ease, background .14s ease;
+}
+.day-head__edit:hover { transform: translateY(-1px); box-shadow: var(--shadow); background: #fff; }
+.day-head__edit:focus-visible { outline: none; box-shadow: var(--ring); }
+
+.day-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: 100%;
+  margin: -4px 0 14px;
+  padding: 8px 14px;
+  border-radius: var(--pill);
+  background: color-mix(in srgb, var(--gold) 14%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--gold) 32%, var(--line));
+  color: var(--ink-soft);
+  font-weight: 600;
+  font-size: .82rem;
+}
+
+/* =============================================================================
+   גרירה ושחרור — מצב פעיל, עותק צף, קו חיווי, והדגשת יעדים.
+   ========================================================================== */
+/* בזמן החזקה מותר לגלול אנכית; הגרירה מתחילה בלחיצה ארוכה או מהידית. */
+.day-layout.is-editable .tl-item { touch-action: pan-y; }
+/* בזמן גרירה בפועל — חוסמים גלילה על הפריט הלכוד. */
+.day-layout.is-reordering .tl-item { touch-action: none; }
+.day-layout.is-reordering { cursor: grabbing; }
+body.tl-no-select { user-select: none; -webkit-user-select: none; }
+
+.tl-item.is-source { opacity: .34; pointer-events: none; }
+.tl-item.is-source .tl-card { border-style: dashed; box-shadow: none; }
+
+/* העותק הצף שעוקב אחרי המצביע (מוגבה עם סיבוב/הגדלה/צל). */
+.tl-card.is-dragging {
+  position: fixed;
+  z-index: 9999;
+  margin: 0;
+  pointer-events: none;
+  transform: scale(1.03) rotate(-1.6deg);
+  box-shadow: var(--shadow-lg);
+  border-color: color-mix(in srgb, var(--paprika) 30%, var(--line));
+  opacity: .97;
+  cursor: grabbing;
+}
+.tl-card.is-dragging .tl-card__ops { display: none; }
+.tl-card.is-dragging .tl-handle { color: var(--paprika); }
+
+/* קו חיווי נקודת השחרור. */
+.tl-drop-line {
+  position: fixed;
+  z-index: 9998;
+  height: 0;
+  display: none;
+  border-top: 3px dashed var(--paprika);
+  border-radius: var(--pill);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--paprika) 15%, transparent);
+  pointer-events: none;
+}
+.tl-drop-line::before {
+  content: "";
+  position: absolute;
+  inset-block-start: -5px;
+  inset-inline-start: -2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--paprika);
+}
+
+/* הדגשת קבוצת חלק-יום כיעד שחרור. */
+.tl-group.is-drop-target {
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--danube) 7%, transparent);
+  outline: 2px dashed color-mix(in srgb, var(--danube) 45%, transparent);
+  outline-offset: 4px;
+}
+
+/* הדגשת צ'יפ יום ב-daypicker כיעד "העבר ליום אחר". */
+.daypick.is-drop-target {
+  border-color: transparent;
+  background: var(--grad-candy);
+  color: #fff;
+  box-shadow: var(--shadow);
+  transform: translateY(-2px) scale(1.02);
+}
+.daypick.is-drop-target .d-lbl,
+.daypick.is-drop-target .d-date { color: rgba(255, 255, 255, .9); }
+
+/* במסכי מגע — כפתורי הכרטיס גלויים תמיד במצב עריכה. */
+@media (hover: none) {
+  .day-layout.is-editable .tl-card__ops { opacity: 1; transform: none; }
+  .tl-travel--add { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tl-card.is-dragging { transform: none; }
+  .daypick.is-drop-target { transform: none; }
+}

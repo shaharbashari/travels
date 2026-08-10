@@ -89,9 +89,16 @@
 ### DayItem
 ```
 { period?:'בוקר'|'צהריים'|'אחר הצהריים'|'ערב',
-  time?:'HH:MM', emoji?, title, desc?, place? }
+  time?:'HH:MM', emoji?, title, desc?, place?,
+  travel?: { mode:TravelMode, duration:string, line?:string, note?:string } }
 ```
 `period` מקבץ פריטים בציר הזמן. `place` — שם שמתאים ל-`name` של Place ויוצר קישור ל"מה עושים".
+
+`travel` מתאר את הדרך **אל** הפעילות מהפעילות הקודמת:
+- `mode` — אחד מהמפתחות המדויקים: `walk`, `metro`, `tram`, `bus`, `taxi`, `car`, `boat`, `train`, `funicular`, `bike`.
+- `duration` — משך קצר בעברית, למשל `'10 דק׳'` או `'25 דק׳'`.
+- `line?` — מספר קו או מזהה מסלול, למשל `'2'`, `'M1'`, `'16'` או `'100E'`; משמיטים כשלא רלוונטי.
+- `note?` — טיפ נסיעה קצר ושימושי.
 
 ### Place
 ```
