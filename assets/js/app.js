@@ -84,13 +84,21 @@ function tabbar(tour, activeTab) {
 }
 
 // ---- רינדור ------------------------------------------------------------
+let _lastRouteKey = null;
+function keepScroll(key) {
+  // גלילה לראש הדף רק כשמסך משתנה — לא אחרי שמירה/עדכון חי (למשל גרירת פעילות)
+  const changed = key !== _lastRouteKey;
+  _lastRouteKey = key;
+  if (changed) window.scrollTo(0, 0);
+}
+
 function renderTrips() {
   const ctx = { tours: store.getTours(), config, canEdit: auth.canEdit() };
   app.innerHTML = topbarTrips() + `<main class="container">${trips.render(ctx)}</main>`;
   trips.mount?.(ctx, app);
   wireChrome();
   edit.refresh?.({ route: { name: 'trips' }, canEdit: auth.canEdit() });
-  window.scrollTo(0, 0);
+  keepScroll('trips');
 }
 
 function renderTour(route) {
@@ -117,7 +125,7 @@ function renderTour(route) {
   view.mount?.(ctx, app);
   wireChrome();
   edit.refresh?.({ route, tour, place: ctx.place, canEdit: auth.canEdit() });
-  window.scrollTo(0, 0);
+  keepScroll(`${route.tourId}/${route.tab}/${route.param || ''}`);
 }
 
 function route() {

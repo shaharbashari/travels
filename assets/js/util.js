@@ -77,6 +77,33 @@ export const CATEGORIES = {
 /** צבע לפי אינדקס (לנקודות מסע / פינים) — פלטה בהירה. */
 export const PALETTE = ['#ff4d67', '#2aa6e8', '#ffc233', '#7b5ce0', '#23c98a', '#ff8a3d', '#12c2b3'];
 
+/** חלקי היום — סדר קבוע לציר הזמן, לגרירה ולטפסים. */
+export const PERIODS = ['בוקר', 'צהריים', 'אחר הצהריים', 'ערב'];
+
+/** אמצעי תחבורה בין פעילויות (item.travel.mode). */
+export const TRAVEL_MODES = {
+  walk: { he: 'ברגל', emoji: '🚶' },
+  metro: { he: 'מטרו', emoji: '🚇' },
+  tram: { he: 'טראם', emoji: '🚋' },
+  bus: { he: 'אוטובוס', emoji: '🚌' },
+  taxi: { he: 'מונית / Bolt', emoji: '🚕' },
+  car: { he: 'רכב', emoji: '🚗' },
+  boat: { he: 'שיט', emoji: '⛴️' },
+  train: { he: 'רכבת', emoji: '🚆' },
+  funicular: { he: 'רכבל', emoji: '🚡' },
+  bike: { he: 'אופניים', emoji: '🚲' },
+};
+
+/** תווית קריאה למקטע נסיעה: "🚶 ברגל · 12 דק׳". */
+export function travelLabel(travel) {
+  if (!travel) return '';
+  const m = TRAVEL_MODES[travel.mode] || TRAVEL_MODES.walk;
+  const bits = [`${m.emoji} ${m.he}`];
+  if (travel.line) bits.push(`קו ${travel.line}`);
+  if (travel.duration) bits.push(travel.duration);
+  return bits.join(' · ');
+}
+
 /**
  * תמונה ממוזערת עם נפילה חיננית לאימוג׳י אם אין תמונה / התמונה נכשלת.
  * @param {string} [img]   כתובת תמונה

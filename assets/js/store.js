@@ -117,3 +117,69 @@ export async function updateTourFields(tourId, patch) {
   const t = clone(getTour(tourId)); if (!t) return { ok: false };
   return saveTour({ ...t, ...patch });
 }
+
+// ---- פריטי מסלול (ימים) -------------------------------------------------
+function findDay(tour, dayIndex) {
+  return (tour.days || []).find((d) => Number(d.index) === Number(dayIndex));
+}
+
+/** עדכון שדות של יום (כותרת, תת-כותרת, לינה וכו׳). */
+export async function updateDay(tourId, dayIndex, patch) {
+  const t = clone(getTour(tourId)); if (!t) return { ok: false };
+  const d = findDay(t, dayIndex); if (!d) return { ok: false };
+  Object.assign(d, patch);
+  return saveTour(t);
+}
+
+/** הוספה/עדכון של פעילות ביום. itemIndex=null → הוספה בסוף (או במיקום at). */
+export async function upsertDayItem(tourId, dayIndex, item, itemIndex = null, at = null) {
+  const t = clone(getTour(tourId)); if (!t) return { ok: false };
+  const d = findDay(t, dayIndex); if (!d) return { ok: false };
+  d.items = d.items || [];
+  if (itemIndex == null || itemIndex < 0 || itemIndex >= d.items.length) {
+    if (at == null || at < 0 || at > d.items.length) d.items.push(item);
+    else d.items.splice(at, 0, item);
+  } else {
+    d.items[itemIndex] = { ...d.items[itemIndex], ...item };
+  }
+  return saveTour(t);
+}
+
+/** מחיקת פעילות. */
+export async function removeDayItem(tourId, dayIndex, itemIndex) {
+  const t = clone(getTour(tourId)); if (!t) return { ok: false };
+  const d = findDay(t, dayIndex); if (!d || !d.items) return { ok: false };
+  d.items.splice(itemIndex, 1);
+  return saveTour(t);
+}
+
+/**
+ * העברת פעילות: בין ימים, בין חלקי היום, ושינוי סדר.
+ * @param {string} tourId
+ * @param {number} fromDay  index של היום המקורי
+ * @param {number} fromItem אינדקס הפריט במערך items של אותו יום
+ * @param {number} toDay    index של יום היעד (יכול להיות זהה)
+ * @param {number|null} toItem מיקום היעד במערך items של יום היעד (null = לסוף)
+ * @param {object} [patch]  שדות לעדכן תוך כדי (למשל { period:'ערב', time:'19:30' })
+ */
+export async function moveDayItem(tourId, fromDay, fromItem, toDay, toItem = null, patch = null) {
+  const t = clone(getTour(tourId)); if (!t) return { ok: false };
+  const src = findDay(t, fromDay); const dst = findDay(t, toDay);
+  if (!src || !dst || !src.items || fromItem < 0 || fromItem >= src.items.length) return { ok: false };
+  const [moved] = src.items.splice(fromItem, 1);
+  if (patch) Object.assign(moved, patch);
+  dst.items = dst.items || [];
+  let at = toItem;
+  if (at == null || at < 0 || at > dst.items.length) at = dst.items.length;
+  dst.items.splice(at, 0, moved);
+  return saveTour(t);
+}
+
+/** הוספת יום חדש בסוף המסלול. */
+export async function addDay(tourId, day) {
+  const t = clone(getTour(tourId)); if (!t) return { ok: false };
+  t.days = t.days || [];
+  const nextIndex = t.days.reduce((m, d) => Math.max(m, Number(d.index) || 0), 0) + 1;
+  t.days.push({ index: nextIndex, date: '', title: `יום ${nextIndex}`, items: [], ...day });
+  return saveTour(t);
+}

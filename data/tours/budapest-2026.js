@@ -436,7 +436,7 @@ const budapest2026 = {
         { period: 'צהריים', emoji: '⛪', title: 'בזיליקת סנט סטפן', desc: 'לא לוותר על העלייה לתצפית הגג — הנוף ביום בהיר עוצר נשימה.', place: 'בזיליקת סנט סטפן' },
         { period: 'צהריים', emoji: '🍔', title: 'המבורגר ב-Bamba Marha', desc: 'ממש קרוב לבזיליקה.', place: 'Bamba Marha' },
         { period: 'אחר הצהריים', emoji: '🛍️', title: 'זמן חופשי ב-Fashion Street', desc: 'להשלים קניות, או לשבת בבית קפה עם אווירה פריזאית.', place: 'Fashion Street' },
-        { period: 'ערב', time: '19:30', emoji: '🚕', title: 'מונית לשדה התעופה', desc: 'יציאה מהמלול בסביבות 19:30.' },
+        { period: 'ערב', time: '19:30', emoji: '🚕', title: 'מונית לשדה התעופה', desc: 'יציאה מהמלון בסביבות 19:30.' },
         { period: 'ערב', time: '23:15', emoji: '✈️', title: 'טיסה חזרה לישראל', desc: 'המראה בשעה 23:15 מבודפשט.' },
       ],
     },
