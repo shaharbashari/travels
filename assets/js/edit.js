@@ -13,6 +13,7 @@ import * as store from './store.js';
 import * as auth from './auth.js';
 import { CATEGORIES, iconFor, pid, slugify, PERIODS, TRAVEL_MODES, travelLabel, fmtWeekday, fmtDateShort } from './util.js';
 import { estimateFor, formatDistance } from './travel.js';
+import { suggest as placeSuggest, details as placeDetails } from './placesearch.js';
 
 // ---- Wikimedia Commons (client-side, CORS-friendly) --------------------------
 const COMMONS = (q) =>
@@ -133,15 +134,19 @@ function repeatLinks(initial = []) {
   const addBtn = el('button', { type: 'button', class: 'ed-repeat__add', onclick: () => addRow({}) }, ['＋ קישור']);
   const wrap = el('div', { class: 'ed-repeat' }, [rows, addBtn]);
   const TYPES = [['site', 'אתר'], ['map', 'מפה'], ['ticket', 'כרטיסים'], ['menu', 'תפריט'], ['social', 'רשת'], ['other', 'אחר']];
+  // תוויות לסוגים החיצוניים (מה-placesearch/סכימה) כדי לשמר אותם בבחירה
+  const EXTRA_LABELS = { website: 'אתר', tickets: 'כרטיסים', info: 'מידע' };
 
   function addRow(l) {
     l = l || {};
     const label = el('input', { class: 'ed-input', placeholder: 'תווית', value: l.label || '' });
     const url = el('input', { class: 'ed-input', type: 'url', placeholder: 'https://…', value: l.url || '', dir: 'ltr' });
     const type = el('select', { class: 'ed-select' });
-    TYPES.forEach(([v, he]) => {
+    const want = l.type || 'site';
+    const opts = TYPES.some(([v]) => v === want) ? TYPES : TYPES.concat([[want, EXTRA_LABELS[want] || want]]);
+    opts.forEach(([v, he]) => {
       const o = el('option', { value: v }, [he]);
-      if ((l.type || 'site') === v) o.selected = true;
+      if (want === v) o.selected = true;
       type.appendChild(o);
     });
     const del = el('button', { type: 'button', class: 'ed-repeat__del', title: 'הסרה', 'aria-label': 'הסרה', onclick: () => row.remove() }, ['✕']);
@@ -157,6 +162,15 @@ function repeatLinks(initial = []) {
       const inputs = r.querySelectorAll('input');
       return { label: inputs[0].value.trim(), url: inputs[1].value.trim(), type: r.querySelector('select').value };
     }).filter((x) => x.url),
+    add: (l) => {
+      const u = l && l.url ? String(l.url).trim() : '';
+      if (!u) return;
+      const exists = Array.prototype.some.call(rows.querySelectorAll('.ed-repeat__row'), (r) => {
+        const inputs = r.querySelectorAll('input');
+        return inputs[1] && inputs[1].value.trim() === u;
+      });
+      if (!exists) addRow(l);
+    },
   };
 }
 
@@ -319,6 +333,10 @@ function toast(msg) {
 function openPlaceForm(tour, place) {
   const p = place || {};
   const isEdit = !!(place && place.id);
+  // מזהה מקורי — נשמר לאורך כל חיי הטופס כדי שעריכה תעדכן את המקום הקיים
+  // (ולא תיצור כפילות) גם אם השם משתנה. ה-store מזהה שינוי-שם לפי ה-id הזה
+  // ומעדכן אוטומטית את קישורי המסלול.
+  const originalId = (place && place.id) || null;
   const catKeys = Object.keys(CATEGORIES);
   const category0 = CATEGORIES[p.category] ? p.category : catKeys[0];
 
@@ -372,8 +390,196 @@ function openPlaceForm(tour, place) {
   const nameList = el('datalist', { id: 'ed-place-names' });
   (tour.places || []).forEach((pp) => { if (pp.id !== p.id && pp.name) nameList.appendChild(el('option', { value: pp.name })); });
 
+  // ---------------------------------------------------------------------------
+  //  חיפוש מקום בסגנון Google Maps + מילוי אוטומטי מלא (Photon/Nominatim/ויקיפדיה)
+  //  בוחרים הצעה → כל השדות המתאימים מתמלאים; שדות שהמשתמש כבר מילא לא נדרסים.
+  // ---------------------------------------------------------------------------
+  function buildPlaceSearch() {
+    const pickNum = (...vals) => { for (const v of vals) { const n = Number(v); if (Number.isFinite(n)) return n; } return undefined; };
+    const dest = (tour && tour.destination) || {};
+    const hotel = (tour && tour.hotel) || {};
+    const biasLat = pickNum(dest.lat, hotel.lat);
+    const biasLng = pickNum(dest.lng, hotel.lng);
+    const city = (dest.city || '').trim();
+
+    const boxId = 'ed-place-search-' + (++uid);
+    const input = el('input', {
+      class: 'ed-input ed-search__input', type: 'text', autocomplete: 'off',
+      id: boxId + '-input', placeholder: '🔎 חיפוש מקום…',
+      role: 'combobox', 'aria-expanded': 'false', 'aria-autocomplete': 'list',
+      'aria-controls': boxId + '-list', 'aria-haspopup': 'listbox',
+    });
+    const panel = el('div', { class: 'ed-search__panel', role: 'listbox', id: boxId + '-list' });
+    const status = el('div', { class: 'ed-search__status', hidden: true, 'aria-live': 'polite' });
+    const wrap = el('div', { class: 'ed-search' }, [input, panel, status]);
+    const fieldWrap = el('div', { class: 'ed-field ed-search-field' }, [
+      el('label', { class: 'ed-label', for: input.id }, ['חיפוש מקום (כמו בגוגל מפות)']),
+      wrap,
+      el('div', { class: 'ed-hint' }, ['בחרו הצעה — שם, קואורדינטות, תמונה, תיאור, כתובת ושעות יתמלאו אוטומטית ✨']),
+    ]);
+
+    // --- לא דורסים קלט משתמש: שדה נטען רק אם ריק או שלא נגעו בו ---
+    const locked = new WeakSet();
+    const FILL = [
+      [nameInput, 'שם'], [heInput, 'כותרת משנה'], [descInput, 'תיאור קצר'], [longInput, 'תיאור מורחב'],
+      [imgInput, 'תמונה'], [addressInput, 'כתובת'], [hoursInput, 'שעות'],
+      [latInput, 'קו רוחב'], [lngInput, 'קו אורך'], [tagsInput, 'תגיות'],
+    ];
+    FILL.forEach(([inp]) => {
+      inp.addEventListener('input', () => locked.add(inp));
+      if (isEdit && String(inp.value || '').trim()) locked.add(inp);
+    });
+    catSelect.addEventListener('change', () => locked.add(catSelect));
+    if (isEdit) locked.add(catSelect);
+
+    function fillText(inp, value, label, skipped) {
+      const v = value == null ? '' : String(value).trim();
+      if (!v) return;
+      const cur = inp.value.trim();
+      if (cur === v) return;
+      if (cur === '' || !locked.has(inp)) inp.value = v;
+      else if (label) skipped.push(label);
+    }
+    function fillCat(cat, skipped) {
+      if (!cat || !CATEGORIES[cat] || catSelect.value === cat) return;
+      if (!locked.has(catSelect)) catSelect.value = cat;
+      else skipped.push('קטגוריה');
+    }
+    function setStatus(kind, text) {
+      status.className = 'ed-search__status' + (kind ? ' is-' + kind : '');
+      status.innerHTML = '';
+      if (!text) { status.hidden = true; return; }
+      status.hidden = false;
+      if (kind === 'loading') status.appendChild(el('span', { class: 'ed-search__spin', 'aria-hidden': 'true' }));
+      status.appendChild(el('span', {}, [text]));
+    }
+    function applyDetails(d, sugg) {
+      d = d || {};
+      const skipped = [];
+      fillText(nameInput, d.name || sugg.name, 'שם', skipped);
+      fillText(heInput, d.he, 'כותרת משנה', skipped);
+      fillCat(d.category, skipped);
+      if (!emojiTouched) emojiInput.value = d.emoji || iconFor(nameInput.value, catSelect.value);
+      fillText(descInput, d.desc, 'תיאור קצר', skipped);
+      fillText(longInput, d.long, 'תיאור מורחב', skipped);
+      if (d.img) fillText(imgInput, d.img, 'תמונה ראשית', skipped);
+      const gallery = [];
+      if (d.img) gallery.push(d.img);
+      if (Array.isArray(d.images)) d.images.forEach((u) => gallery.push(u));
+      gallery.forEach((u) => imagesRepeat.add(u));
+      fillText(addressInput, d.address, 'כתובת', skipped);
+      fillText(hoursInput, d.hours, 'שעות', skipped);
+      if (d.lat != null) fillText(latInput, String(d.lat), 'קו רוחב', skipped);
+      if (d.lng != null) fillText(lngInput, String(d.lng), 'קו אורך', skipped);
+      if (Array.isArray(d.tags) && d.tags.length) fillText(tagsInput, d.tags.join(', '), 'תגיות', skipped);
+      (d.links || []).forEach((l) => linksRepeat.add(l));
+      const base = 'מולא אוטומטית מ-OpenStreetMap/ויקיפדיה ✓';
+      setStatus('ok', skipped.length ? `${base} · נשמרו שדות קיימים: ${skipped.join(', ')}` : base);
+    }
+
+    let items = [];
+    let active = -1;
+    let open = false;
+    let sugAbort = null;
+    let detAbort = null;
+    let timer = 0;
+
+    function openList() { open = true; panel.classList.add('is-open'); input.setAttribute('aria-expanded', 'true'); }
+    function closeList() {
+      open = false; active = -1;
+      panel.classList.remove('is-open');
+      input.setAttribute('aria-expanded', 'false');
+      input.removeAttribute('aria-activedescendant');
+    }
+    function setActive(i) {
+      const opts = panel.querySelectorAll('.ed-search__opt');
+      if (!opts.length) { active = -1; return; }
+      active = (i + opts.length) % opts.length;
+      opts.forEach((o, idx) => o.setAttribute('aria-selected', idx === active ? 'true' : 'false'));
+      const cur = opts[active];
+      if (cur) { input.setAttribute('aria-activedescendant', cur.id); cur.scrollIntoView({ block: 'nearest' }); }
+    }
+    function renderList(results) {
+      items = results || [];
+      panel.innerHTML = '';
+      active = -1;
+      input.removeAttribute('aria-activedescendant');
+      if (!items.length) {
+        panel.appendChild(el('div', { class: 'ed-search__empty' }, ['לא נמצאו תוצאות']));
+        openList();
+        return;
+      }
+      items.forEach((s, i) => {
+        const opt = el('div', {
+          class: 'ed-search__opt', role: 'option', id: boxId + '-opt-' + i, 'aria-selected': 'false',
+        }, [
+          el('span', { class: 'ed-search__name' }, [s.name]),
+          s.sub ? el('span', { class: 'ed-search__sub' }, [s.sub]) : null,
+        ]);
+        // mousedown (לא click) כדי לא לאבד פוקוס/לסגור לפני הבחירה — ידידותי גם למגע
+        opt.addEventListener('mousedown', (e) => { e.preventDefault(); choose(s); });
+        opt.addEventListener('mouseenter', () => setActive(i));
+        panel.appendChild(opt);
+      });
+      openList();
+    }
+    async function runQuery(q) {
+      if (sugAbort) sugAbort.abort();
+      sugAbort = new AbortController();
+      try {
+        const results = await placeSuggest(q, { lat: biasLat, lng: biasLng, limit: 8, signal: sugAbort.signal });
+        if (input.value.trim() !== q) return; // תוצאה מיושנת — התעלם
+        renderList(results);
+      } catch (e) {
+        if (e && e.name === 'AbortError') return; // בקשה שבוטלה — בולעים בשקט
+        console.warn('[edit] place suggest failed', e);
+        closeList(); // שגיאת רשת — משאירים את הטופס שמיש להקלדה ידנית
+      }
+    }
+    function schedule() {
+      clearTimeout(timer);
+      const q = input.value.trim();
+      if (q.length < 3) { closeList(); return; }
+      timer = setTimeout(() => runQuery(q), 300); // debounce ~300ms, מ-3 תווים ומעלה
+    }
+    async function choose(s) {
+      closeList();
+      input.value = s.name;
+      setStatus('loading', 'ממלא פרטים…');
+      if (detAbort) detAbort.abort();
+      detAbort = new AbortController();
+      try {
+        const d = await placeDetails(s, { city, signal: detAbort.signal });
+        applyDetails(d, s);
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+        console.warn('[edit] place details failed', e);
+        applyDetails({ name: s.name, category: s.category, lat: s.lat, lng: s.lng, address: s.address }, s);
+        setStatus('warn', 'חלק מהפרטים לא נטענו — אפשר להשלים ידנית');
+      }
+    }
+
+    input.addEventListener('input', schedule);
+    input.addEventListener('focus', () => { if (items.length && input.value.trim().length >= 3) openList(); });
+    input.addEventListener('blur', () => { setTimeout(closeList, 150); });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); if (!open && items.length) openList(); setActive(active + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); if (!open && items.length) openList(); setActive(active - 1); }
+      else if (e.key === 'Enter') {
+        e.preventDefault(); // שדה החיפוש לעולם לא שולח את הטופס
+        if (open && items.length) choose(items[active >= 0 ? active : 0]);
+      } else if (e.key === 'Escape') {
+        if (open) { e.preventDefault(); e.stopPropagation(); closeList(); }
+      }
+    });
+
+    return fieldWrap;
+  }
+  const placeSearch = buildPlaceSearch();
+
   const body = el('div', { class: 'ed-form' }, [
     nameList,
+    placeSearch,
     field('שם המקום', nameInput, 'שם שמופיע בכרטיס וברשימה'),
     row2(field('כותרת משנה (לועזית)', heInput), field('קטגוריה', catSelect)),
     row2(field('אימוג׳י', emojiInput, 'נבחר אוטומטית — אפשר לשנות'), field('יום במסלול', dayInput)),
@@ -411,7 +617,7 @@ function openPlaceForm(tour, place) {
       const tips = tipsRepeat.values();
       const city = (tour.destination && tour.destination.city) || '';
       const out = {
-        id: p.id || pid(name),
+        id: originalId || pid(name),
         name,
         he: heInput.value.trim(),
         category,
@@ -1063,11 +1269,21 @@ function injectPencils(ctx) {
   const r = ctx.route || {};
   if (r.name !== 'tour' || !ctx.tour) return;
 
-  if (r.tab === 'place' && ctx.place) {
-    const title = root.querySelector('.section-title');
-    if (title && !title.querySelector('.edit-pencil')) {
-      title.appendChild(makePencil('עריכת מקום', () => openPlaceForm(ctx.tour, ctx.place)));
+  if (r.tab === 'place') {
+    // עוגן יציב שנוסף ל-views/place.js; נופלים אחורה לכותרת-העל ולכותרת המקטע
+    // הישנה אם ה-markup ישתנה שוב. פותרים את המקום לפי data-place-id, אחרת ctx.place.
+    const anchor = root.querySelector('[data-place-actions]')
+      || root.querySelector('.detail-hero__title')
+      || root.querySelector('.section-title');
+    if (!anchor || anchor.querySelector('.edit-pencil')) return;
+    let place = ctx.place || null;
+    const wantId = anchor.getAttribute ? anchor.getAttribute('data-place-id') : '';
+    if (wantId) {
+      const hit = (ctx.tour.places || []).find((pp) => pp.id === wantId);
+      if (hit) place = hit;
     }
+    if (!place) return;
+    anchor.appendChild(makePencil('עריכת מקום', () => openPlaceForm(ctx.tour, place)));
     return;
   }
   if (r.tab !== 'explore') return;

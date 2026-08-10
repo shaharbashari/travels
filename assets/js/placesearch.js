@@ -70,20 +70,32 @@ export async function suggest(query, opts = {}) {
   const key = `${q}|${opts.lat ?? ''},${opts.lng ?? ''}`;
   if (cache.has(key)) return cache.get(key);
 
-  const params = new URLSearchParams({ q, limit: String(opts.limit || 8), lang: 'en' });
-  if (typeof opts.lat === 'number' && typeof opts.lng === 'number') {
-    params.set('lat', String(opts.lat));
-    params.set('lon', String(opts.lng));
+  const near = typeof opts.lat === 'number' && typeof opts.lng === 'number';
+  const base = { q, limit: String(opts.limit || 8), lang: 'en' };
+
+  // שלב 1: חיפוש מוגבל לאזור היעד — כך "New York Cafe" מחזיר את זה שבבודפשט
+  // ולא רחוב בצרפת. שלב 2 (אם אין תוצאות): חיפוש עולמי עם הטיה ליעד.
+  const attempts = [];
+  if (near) {
+    const d = 0.30;
+    attempts.push({ ...base, bbox: `${opts.lng - d},${opts.lat - d},${opts.lng + d},${opts.lat + d}` });
+    attempts.push({ ...base, lat: String(opts.lat), lon: String(opts.lng) });
+  } else {
+    attempts.push(base);
   }
 
-  let raw;
-  try {
-    raw = await getJSON(`${PHOTON}?${params.toString()}`, opts.signal);
-  } catch (e) {
-    if (e?.name === 'AbortError') throw e;
-    console.warn('[placesearch] suggest failed', e);
-    return [];
+  let raw = null;
+  for (const params of attempts) {
+    try {
+      const j = await getJSON(`${PHOTON}?${new URLSearchParams(params).toString()}`, opts.signal);
+      if (j?.features?.length) { raw = j; break; }
+      raw = raw || j;
+    } catch (e) {
+      if (e?.name === 'AbortError') throw e;
+      console.warn('[placesearch] suggest failed', e);
+    }
   }
+  if (!raw) return [];
 
   const out = (raw?.features || []).map((f) => {
     const p = f.properties || {};
@@ -121,7 +133,11 @@ export async function suggest(query, opts = {}) {
   // דירוג לפי קרבה ליעד — כדי ש"New York Cafe" בבודפשט יופיע לפני עיר אחרת
   if (typeof opts.lat === 'number' && typeof opts.lng === 'number') {
     const dist = (s) => Math.hypot((s.lat - opts.lat) * 111, (s.lng - opts.lng) * 78);
-    unique.forEach((s) => { s.km = Math.round(dist(s)); });
+    unique.forEach((s) => {
+      s.km = Math.round(dist(s));
+      // סימון ברור לתוצאה רחוקה, כדי שלא ייבחר מקום בעיר אחרת בטעות
+      if (s.km > 100) s.sub = `${s.sub}${s.sub ? ' · ' : ''}⚠️ ${s.km.toLocaleString('he-IL')} ק״מ מהיעד`;
+    });
     unique.sort((a, b) => {
       const near = (x) => (x.km <= 60 ? 0 : 1);   // קודם כל מה שבאזור היעד
       return near(a) - near(b) || a.km - b.km;
