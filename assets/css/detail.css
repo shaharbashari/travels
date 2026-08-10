@@ -168,6 +168,10 @@
 .place-card .place-card__foot a,
 .place-card .place-card__foot .place-link { position: relative; z-index: 2; }
 
+/* עוגן לכפתור העריכה בעמוד המקום (מוזרק ע"י שכבת העריכה, מוסתר לקוראים) */
+.detail-hero__actions { position: absolute; top: 12px; inset-inline-start: 12px; z-index: 3; display: flex; gap: 8px; }
+.detail-hero__actions:empty { display: none; }
+
 /* =============================================================================
    Lightbox — fullscreen image overlay
    ========================================================================== */

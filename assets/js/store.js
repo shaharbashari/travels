@@ -203,19 +203,42 @@ export async function deleteTour(id) {
 
 export async function addTour(tour) { return saveTour(tour); }
 
+/**
+ * הוספה/עדכון של מקום.
+ * חשוב: פריטי המסלול מקשרים למקום לפי השם (`item.place`), ולכן שינוי שם
+ * מתפשט אוטומטית לכל הפעילויות שמקושרות אליו — כך הקישור לא נשבר
+ * וזמני הנסיעה (שמחושבים לפי הקואורדינטות של המקום) נשארים נכונים.
+ */
 export async function upsertPlace(tourId, place) {
   const t = clone(getTour(tourId)); if (!t) return { ok: false };
   if (!place.id) place.id = pid(place.name || place.he || String(Math.random()));
   t.places = t.places || [];
   const i = t.places.findIndex((p) => p.id === place.id);
-  if (i >= 0) t.places[i] = { ...t.places[i], ...place };
-  else t.places.push(place);
+  if (i >= 0) {
+    const prevName = t.places[i].name;
+    t.places[i] = { ...t.places[i], ...place };
+    const newName = t.places[i].name;
+    if (prevName && newName && prevName !== newName) {
+      (t.days || []).forEach((d) => (d.items || []).forEach((it) => {
+        if (it.place === prevName) it.place = newName;
+      }));
+    }
+  } else {
+    t.places.push(place);
+  }
   return saveTour(t);
 }
 
+/** מחיקת מקום — מנתק גם את הקישור מפריטי המסלול, כדי לא להשאיר קישור שבור. */
 export async function removePlace(tourId, placeId) {
   const t = clone(getTour(tourId)); if (!t) return { ok: false };
+  const gone = (t.places || []).find((p) => p.id === placeId);
   t.places = (t.places || []).filter((p) => p.id !== placeId);
+  if (gone?.name) {
+    (t.days || []).forEach((d) => (d.items || []).forEach((it) => {
+      if (it.place === gone.name) delete it.place;
+    }));
+  }
   return saveTour(t);
 }
 

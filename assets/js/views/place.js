@@ -55,6 +55,7 @@ export function render({ tour, place }) {
         ${c.he ? `<span class="detail-chip" style="--c:${color}"><span class="detail-chip__em">${esc(emoji)}</span>${esc(c.he)}</span>` : ''}
         <h1 class="detail-hero__title">${esc(place.name)}${heName ? ` <span class="lat">${esc(heName)}</span>` : ''}</h1>
       </div>
+      <div class="detail-hero__actions" data-place-actions data-place-id="${esc(place.id || '')}"></div>
     </header>`;
 
   // ---------- Meta chips ----------
