@@ -100,7 +100,9 @@ const budapest2026 = {
   status: 'upcoming', // upcoming | active | past  (מחושב גם אוטומטית מהתאריכים)
   order: 1,
 
-  destination: { city: 'בודפשט', country: 'הונגריה', flag: '🇭🇺' },
+  destination: { city: 'בודפשט', country: 'הונגריה', flag: '🇭🇺', lat: 47.4979, lng: 19.0402 },
+  // שדה התעופה — משמש לחישוב אוטומטי של זמני נסיעה מ/אל השדה
+  airport: { name: 'Budapest Ferenc Liszt (BUD)', lat: 47.4369, lng: 19.2556 },
   title: 'בודפשט',
   subtitle: 'חמישה ימים על גדות הדנובה',
   dates: { start: '2026-09-04', end: '2026-09-08' },
