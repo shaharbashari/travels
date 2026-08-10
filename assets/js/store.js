@@ -1,8 +1,10 @@
 // ============================================================================
 //  store.js — שכבת הנתונים.
-//  מקור אמת = נתוני ה-seed הסטטיים (data/tours/*.js), ומעליהם שכבת "overlay":
-//    · אם Firebase מוגדר → Firestore (collection 'tours'), עדכון חי + שמירה משותפת.
-//    · אחרת → localStorage (עריכה מקומית בדפדפן).
+//  שלוש שכבות שממוזגות בסדר הזה:
+//    1. seed  — הנתונים הסטטיים שבקוד (data/tours/*.js)
+//    2. cloud — מסמכים מ-Firestore (משותפים לכולם, מתעדכנים חי)
+//    3. local — עריכות שנשמרו בדפדפן הזה (fallback כשאין ענן / כשהכתיבה נדחתה)
+//  שכבת local גוברת תמיד, כדי ששינוי של המשתמש לא ייעלם בגלל עדכון מהשרת.
 //  התצוגות מקבלות תמיד אובייקטי טיול באותו מבנה — לכן קריאה עובדת גם בלי ענן.
 // ============================================================================
 import seedTours from '../../data/tours/index.js';
@@ -10,8 +12,9 @@ import { firebaseReady, configured } from './firebase.js';
 import { pid } from './util.js';
 
 const LS_KEY = 'travels_overlay_v1';
-let overlay = { tours: {} };   // { [tourId]: fullTourDoc | { _deleted:true } }
-let effective = [];            // מערך אפקטיבי לאחר מיזוג seed+overlay
+let cloudTours = {};           // { [tourId]: doc }  — מהשרת
+let localTours = {};           // { [tourId]: doc }  — מקומי (גובר על הענן)
+let effective = [];            // המערך האפקטיבי לאחר מיזוג שלוש השכבות
 const subs = new Set();
 
 let _fs = null, _db = null;
@@ -23,7 +26,10 @@ export { configured };
 export function isCloud() { return !!(configured && _db && _fs && !cloudBroken); }
 /** מצב החיבור לענן — לשימוש ב-UI (באנר אזהרה). */
 export function cloudStatus() {
-  return { configured, connected: isCloud(), broken: cloudBroken, error: lastError };
+  return {
+    configured, connected: isCloud(), broken: cloudBroken, error: lastError,
+    pendingLocal: Object.keys(localTours).length,
+  };
 }
 export function onChange(fn) { subs.add(fn); return () => subs.delete(fn); }
 function notify() { computeEffective(); subs.forEach((f) => { try { f(); } catch {} }); }
@@ -62,13 +68,12 @@ function withTimeout(promise, ms = WRITE_TIMEOUT_MS) {
   });
 }
 
-/** נפילה חיננית: אם הכתיבה לענן נכשלה — שומרים מקומית כדי לא לאבד את השינוי. */
-function degradeToLocal(e, mutate) {
+/** נפילה חיננית: אם הכתיבה לענן נכשלה — שומרים בשכבה המקומית כדי לא לאבד את השינוי. */
+function degradeToLocal(e, tourId, doc) {
   cloudBroken = true;
   lastError = (e && (e.code || e.message)) ? String(e.code || e.message) : String(e);
   console.warn('[store] cloud write failed — saving locally instead.', e);
-  loadLocal();
-  mutate();
+  localTours[tourId] = doc;
   saveLocal();
   notify();
   return { ok: true, backend: 'local', degraded: true, error: lastError };
@@ -82,13 +87,18 @@ function assignIds(tour) {
 
 function clone(o) { return typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)); }
 
-function computeEffective() {
-  const byId = new Map();
-  for (const t of seedTours) byId.set(t.id, clone(t));
-  for (const [id, doc] of Object.entries(overlay.tours || {})) {
+function applyLayer(byId, layer) {
+  for (const [id, doc] of Object.entries(layer || {})) {
     if (doc && doc._deleted) byId.delete(id);
     else if (doc) byId.set(id, clone(doc));
   }
+}
+
+function computeEffective() {
+  const byId = new Map();
+  for (const t of seedTours) byId.set(t.id, clone(t));
+  applyLayer(byId, cloudTours);   // הענן גובר על ה-seed
+  applyLayer(byId, localTours);   // ועריכה מקומית גוברת על הכול
   effective = [...byId.values()].map(assignIds).sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
 }
 
@@ -102,12 +112,19 @@ export function getPlace(tourId, placeId) {
 
 // ---- אתחול --------------------------------------------------------------
 function loadLocal() {
-  try { const raw = localStorage.getItem(LS_KEY); if (raw) overlay = JSON.parse(raw); } catch {}
-  if (!overlay.tours) overlay.tours = {};
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      localTours = (parsed && parsed.tours) ? parsed.tours : {};
+    }
+  } catch {}
+  if (!localTours) localTours = {};
 }
-function saveLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(overlay)); } catch {} }
+function saveLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify({ tours: localTours })); } catch {} }
 
 export async function loadAll() {
+  loadLocal(); // עריכות מקומיות ממתינות (אם יש) — נשארות מעל הענן עד שיישמרו בו
   if (configured) {
     const r = await firebaseReady;
     if (r.configured) {
@@ -117,8 +134,8 @@ export async function loadAll() {
           r.fs.collection(r.db, 'tours'),
           (snap) => {
             cloudBroken = false; lastError = null;
-            overlay.tours = {};
-            snap.forEach((d) => { overlay.tours[d.id] = d.data(); });
+            cloudTours = {};
+            snap.forEach((d) => { cloudTours[d.id] = d.data(); });
             notify();
           },
           (err) => {
@@ -126,25 +143,22 @@ export async function loadAll() {
             cloudBroken = true;
             lastError = String(err?.code || err?.message || err);
             console.warn('[store] Firestore unavailable — using local edits.', err);
-            loadLocal();
             notify();
           },
         );
       } catch (e) {
         cloudBroken = true; lastError = String(e?.message || e);
         console.warn('[store] subscribe failed', e);
-        loadLocal();
       }
       // בדיקת בריאות ברקע — לא חוסמת את הרינדור הראשון!
       // אם אין תשובה מהשרת תוך זמן קצר (למשל: מסד הנתונים לא נוצר) מסמנים
-      // שהענן לא זמין, טוענים עריכות מקומיות ומרעננים את המסך.
+      // שהענן לא זמין, כדי שהמשתמש יראה אזהרה ולא יאבד שינויים.
       withTimeout(r.fs.getDocs(r.fs.collection(r.db, 'tours')), 8000).then(
         () => { cloudBroken = false; lastError = null; },
         (e) => {
           cloudBroken = true;
           lastError = String(e?.code || e?.message || e);
           console.warn('[store] Firestore not reachable — local mode.', lastError);
-          loadLocal();
           notify();
         },
       );
@@ -152,7 +166,6 @@ export async function loadAll() {
       return;
     }
   }
-  loadLocal();
   computeEffective();
 }
 
@@ -162,12 +175,14 @@ export async function saveTour(tour) {
   if (isCloud()) {
     try {
       await withTimeout(_fs.setDoc(_fs.doc(_db, 'tours', tour.id), sanitize(tour)));
+      // נשמר בענן → אין יותר צורך בעותק המקומי הממתין
+      if (localTours[tour.id]) { delete localTours[tour.id]; saveLocal(); }
       return { ok: true, backend: 'cloud' };
     } catch (e) {
-      return degradeToLocal(e, () => { overlay.tours[tour.id] = tour; });
+      return degradeToLocal(e, tour.id, tour);
     }
   }
-  overlay.tours[tour.id] = tour; saveLocal(); notify();
+  localTours[tour.id] = tour; saveLocal(); notify();
   return { ok: true, backend: 'local' };
 }
 
@@ -176,12 +191,13 @@ export async function deleteTour(id) {
     try {
       // tombstone so seeded tours stay hidden too
       await withTimeout(_fs.setDoc(_fs.doc(_db, 'tours', id), { _deleted: true, id }));
+      if (localTours[id]) { delete localTours[id]; saveLocal(); }
       return { ok: true, backend: 'cloud' };
     } catch (e) {
-      return degradeToLocal(e, () => { overlay.tours[id] = { _deleted: true }; });
+      return degradeToLocal(e, id, { _deleted: true, id });
     }
   }
-  overlay.tours[id] = { _deleted: true }; saveLocal(); notify();
+  localTours[id] = { _deleted: true }; saveLocal(); notify();
   return { ok: true, backend: 'local' };
 }
 

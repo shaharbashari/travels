@@ -2,6 +2,134 @@
 //  views/info.js — מידע: טיסות, מלון, מזג אוויר, אריזה, תחבורה, שיחון
 // ============================================================================
 import { esc, fmtDate, fmtWeekday } from '../util.js';
+import { fetchWeather, tourCoords, forDate, coversTrip, daysUntilForecast, describe } from '../weather.js';
+
+function tempText(value) {
+  return Number.isFinite(value) ? `${Math.round(value)}°` : '—';
+}
+
+function rainText(value) {
+  return Number.isFinite(value) ? `${Math.round(value)}%` : '—';
+}
+
+function windText(value) {
+  return Number.isFinite(value) ? `${Math.round(value)} קמ״ש` : '—';
+}
+
+function forecastOpeningText(days) {
+  if (!Number.isFinite(days) || days <= 0) return 'התחזית המדויקת תיפתח ממש בקרוב';
+  if (days === 1) return 'התחזית המדויקת תיפתח בעוד יום אחד';
+  return `התחזית המדויקת תיפתח בעוד ${days} ימים`;
+}
+
+function seasonalWeather(tour, note = '') {
+  const notes = tour.weather?.notes || [];
+  return `
+    <div class="weather-seasonal">
+      <div class="weather-seasonal__title">ממוצע עונתי · ${esc(tour.weather?.month || '')}</div>
+      <div class="weather-seasonal__temps">
+        <div class="weather-seasonal__temp">
+          <span class="weather-seasonal__value">${esc(tour.weather?.day || '')}</span>
+          <span class="weather-seasonal__label">ביום</span>
+        </div>
+        <div class="weather-seasonal__temp weather-seasonal__temp--night">
+          <span class="weather-seasonal__value">${esc(tour.weather?.night || '')}</span>
+          <span class="weather-seasonal__label">בלילה</span>
+        </div>
+      </div>
+      <p class="section-sub weather-seasonal__summary">${esc(tour.weather?.summary || '')}</p>
+      ${notes.length ? `<ul class="tips weather-seasonal__notes">${notes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
+      ${note ? `<div class="weather-forecast-note"><span aria-hidden="true">🗓️</span> ${esc(note)}</div>` : ''}
+    </div>`;
+}
+
+function loadingWeather(tour) {
+  return `
+    <div class="weather-now weather-now--loading" role="status">
+      <span class="weather-skeleton weather-skeleton--now-temp"></span>
+      <span class="weather-skeleton weather-skeleton--now-copy"></span>
+      <span class="weather-loading__text">טוען מזג אוויר חי…</span>
+    </div>
+    ${seasonalWeather(tour)}`;
+}
+
+function currentWeather(tour, current) {
+  if (!current) return '';
+  const condition = describe(current.code);
+  const city = tour.destination?.city || tour.title || 'היעד';
+  return `
+    <div class="weather-now">
+      <div class="weather-now__primary">
+        <span class="weather-now__caption">עכשיו ב${esc(city)}</span>
+        <strong class="weather-now__temp" dir="ltr">${esc(tempText(current.temp))}</strong>
+      </div>
+      <div class="weather-now__condition">
+        <span class="weather-now__emoji" aria-hidden="true">${esc(condition.emoji)}</span>
+        <strong>${esc(condition.he)}</strong>
+      </div>
+      <div class="weather-now__wind">
+        <span aria-hidden="true">💨</span>
+        <span>רוח</span>
+        <strong dir="ltr">${esc(windText(current.wind))}</strong>
+      </div>
+    </div>`;
+}
+
+function forecastDays(tour, data) {
+  if (!coversTrip(data, tour)) return [];
+  return (tour.days || []).map((day) => {
+    const weather = forDate(data, day.date);
+    return weather ? { day, weather } : null;
+  }).filter(Boolean);
+}
+
+function forecastStrip(days) {
+  return `
+    <div class="weather-forecast">
+      <div class="weather-forecast__title">התחזית לימי הטיול</div>
+      <div class="weather-days" role="list">
+        ${days.map(({ day, weather }) => {
+          const condition = describe(weather.code);
+          return `
+            <article class="weather-day" role="listitem">
+              <div class="weather-day__head">
+                <strong>${esc(fmtWeekday(day.date))}</strong>
+                <time datetime="${esc(day.date)}">${esc(fmtDate(day.date))}</time>
+              </div>
+              <span class="weather-day__emoji" aria-hidden="true">${esc(condition.emoji)}</span>
+              <span class="weather-day__condition">${esc(condition.he)}</span>
+              <strong class="weather-day__temps" dir="ltr">${esc(`${tempText(weather.max)} / ${tempText(weather.min)}`)}</strong>
+              <span class="weather-day__rain">💧 ${esc(rainText(weather.rain))}</span>
+            </article>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+function updateText(updatedAt) {
+  const date = new Date(updatedAt);
+  if (!Number.isFinite(date.getTime())) return '';
+  try {
+    return new Intl.DateTimeFormat('he-IL', {
+      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+    }).format(date);
+  } catch {
+    return '';
+  }
+}
+
+function weatherSource(updatedAt) {
+  const updated = updateText(updatedAt);
+  return `<div class="weather-source">נתונים: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>${updated ? ` · עודכן ${esc(updated)}` : ''}</div>`;
+}
+
+function liveWeather(tour, data) {
+  const days = forecastDays(tour, data);
+  const body = days.length
+    ? forecastStrip(days)
+    : seasonalWeather(tour, forecastOpeningText(daysUntilForecast(data, tour)));
+  return `${currentWeather(tour, data.current)}${body}${weatherSource(data.updatedAt)}`;
+}
 
 function flightCard(f) {
   return `
@@ -51,13 +179,8 @@ export function render({ tour }) {
     `)}
 
     ${section(`מזג אוויר · ${tour.weather?.month || ''}`, '☀️', `
-      <div class="info-card">
-        <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:baseline">
-          <div><span style="font-family:var(--font-display);font-size:2rem;font-weight:800">${esc(tour.weather?.day || '')}</span> <span style="color:var(--ink-soft)">ביום</span></div>
-          <div><span style="font-family:var(--font-display);font-size:1.5rem;font-weight:800;color:var(--danube)">${esc(tour.weather?.night || '')}</span> <span style="color:var(--ink-soft)">בלילה</span></div>
-        </div>
-        <p class="section-sub" style="margin:12px 0 6px">${esc(tour.weather?.summary || '')}</p>
-        <ul class="tips">${(tour.weather?.notes || []).map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+      <div class="info-card weather-info weather-is-loading" data-weather="info" aria-live="polite" aria-busy="true">
+        ${loadingWeather(tour)}
       </div>
     `)}
 
@@ -150,4 +273,29 @@ export function render({ tour }) {
       </div>
     `) : ''}
   `;
+}
+
+export async function mount({ tour }, root) {
+  const host = root?.querySelector?.('[data-weather="info"]');
+  if (!host) return;
+  const showFallback = () => {
+    try {
+      host.querySelector('.weather-now--loading')?.remove();
+      host.classList.remove('weather-is-loading');
+      host.removeAttribute('aria-busy');
+    } catch {}
+  };
+
+  try {
+    const coords = tourCoords(tour);
+    if (!coords) { showFallback(); return; }
+    const data = await fetchWeather(coords.lat, coords.lng);
+    if (!data) { showFallback(); return; }
+    if (!host.isConnected) return;
+    host.innerHTML = liveWeather(tour, data);
+    host.classList.remove('weather-is-loading');
+    host.removeAttribute('aria-busy');
+  } catch {
+    showFallback();
+  }
 }

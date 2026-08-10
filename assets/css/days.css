@@ -66,6 +66,46 @@
 }
 .tl-travel__note { color: var(--ink-soft); font-size: .76rem; }
 
+/* עוטף את תוכן הצ׳יפ כפריט־פלקס יחיד, כדי שהמפרידים " · " יישארו אחידים. */
+.tl-travel__label { min-width: 0; }
+
+/* משך הנסיעה. כשהוא מחושב אוטומטית הוא מסומן ב-≈ ("זמן משוער") ומקבל קו־תחתון
+   מקווקו עדין, כדי להבדילו מזמן שהמשתמש הקליד ידנית (שמוצג נקי, בלי ≈). */
+.tl-travel__dur { white-space: nowrap; }
+.tl-travel__dur.is-est {
+  cursor: help;
+  text-decoration: underline dotted color-mix(in srgb, var(--danube-deep) 45%, transparent);
+  text-underline-offset: 3px;
+  text-decoration-thickness: from-font;
+}
+
+/* מרחק אווירי — רמז שקט ומשני לצד הצ׳יפ. */
+.tl-travel__dist {
+  color: var(--ink-faint);
+  font-size: .72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* מקטע שהמנוע מציע אוטומטית (עדיין אין נסיעה שמורה) — נקרא כהצעה, לא כתוכנית
+   סגורה: רקע שקוף, מסגרת מקווקוות ודגש נמוך יותר. */
+.tl-travel.is-suggested .tl-travel__chip {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--line-strong);
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.tl-travel.is-suggested .tl-travel__pip {
+  color: var(--ink-faint);
+  opacity: .8;
+}
+/* לעורכים — במעבר עכבר ההצעה מתחזקת ("לחצו כדי לשמור"). */
+.tl-travel.is-suggested.is-editable:hover .tl-travel__chip {
+  border-color: color-mix(in srgb, var(--danube) 40%, var(--line));
+  color: var(--danube-deep);
+}
+
 .tl-travel.is-editable { cursor: pointer; }
 .tl-travel.is-editable:hover .tl-travel__chip { border-style: solid; box-shadow: var(--shadow-sm); }
 .tl-travel:focus-visible { outline: none; }
@@ -292,6 +332,11 @@ body.tl-no-select { user-select: none; -webkit-user-select: none; }
 @media (hover: none) {
   .day-layout.is-editable .tl-card__ops { opacity: 1; transform: none; }
   .tl-travel--add { opacity: 1; }
+}
+
+/* במסכים צרים — מסתירים את המרחק כדי לשמור על מקטע הנסיעה קומפקטי. */
+@media (max-width: 380px) {
+  .tl-travel__dist { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -5,40 +5,55 @@
 //  · לעורכים: גרירה לשינוי סדר / שעה / יום (Pointer Events), והוספה/עריכה/מחיקה.
 //  render(ctx) מחזיר מחרוזת HTML; mount(ctx, root) מחבר מאזינים. אין גישה ל-DOM בזמן import.
 // ============================================================================
-import { esc, fmtWeekday, fmtDateShort, thumb, PERIODS, TRAVEL_MODES, travelLabel } from '../util.js';
+import { esc, fmtWeekday, fmtDateShort, thumb, PERIODS } from '../util.js';
 import * as store from '../store.js';
 import * as edit from '../edit.js';
-
-function placeLookup(tour) {
-  const map = new Map();
-  (tour.places || []).forEach((p) => map.set(p.name, p));
-  return map;
-}
+import * as travel from '../travel.js';
 
 // ---- מקטע נסיעה (איך מגיעים לפעילות הזו מהקודמת) --------------------------
-function travelLeg(item, flatIndex, canEdit) {
+//  הזמן נגזר אוטומטית מהגיאוגרפיה ומאמצעי ההגעה (travel.legFor), ולכן מתעדכן
+//  לבד אחרי שינוי סדר / מעבר יום / החלפת אמצעי — בלי התערבות. ראו assets/js/travel.js.
+function travelLeg(tour, dayItems, flatIndex, placesMap, canEdit) {
   // הפעילות הראשונה ביום אין אליה "נסיעה נכנסת".
   if (flatIndex <= 0) return '';
-  const t = item.travel;
-  if (t) {
-    const mode = TRAVEL_MODES[t.mode] || TRAVEL_MODES.walk;
-    const editable = canEdit
-      ? ` data-act="edit-travel" data-i="${flatIndex}" role="button" tabindex="0" title="עריכת נסיעה"`
-      : '';
+  const leg = travel.legFor(tour, dayItems, flatIndex, placesMap);
+
+  // אין מקטע להצגה: לעורכים — כפתור "הוסף נסיעה"; לקוראים — כלום.
+  if (!leg) {
+    if (!canEdit) return '';
     return `
-      <div class="tl-travel${canEdit ? ' is-editable' : ''}"${editable}>
-        <div class="tl-travel__rail"><span class="tl-travel__pip">${esc(mode.emoji)}</span></div>
-        <div class="tl-travel__main">
-          <span class="tl-travel__chip">${esc(travelLabel(t))}</span>
-          ${t.note ? `<span class="tl-travel__note">${esc(t.note)}</span>` : ''}
-        </div>
+      <div class="tl-travel tl-travel--add" data-act="add-travel" data-i="${flatIndex}" role="button" tabindex="0" title="הוספת נסיעה">
+        <div class="tl-travel__rail"><span class="tl-travel__pip tl-travel__pip--add">＋</span></div>
+        <div class="tl-travel__main"><span class="tl-travel__chip tl-travel__chip--add">➕ הוסף נסיעה</span></div>
       </div>`;
   }
-  if (!canEdit) return '';
+
+  const cls = ['tl-travel'];
+  if (canEdit) cls.push('is-editable');
+  if (leg.suggested) cls.push('is-suggested'); // מקטע מוצע אוטומטית, עוד לא נשמר
+  const editable = canEdit
+    ? ` data-act="edit-travel" data-i="${flatIndex}" role="button" tabindex="0" title="${leg.suggested ? 'הוספת הנסיעה המוצעת' : 'עריכת נסיעה'}"`
+    : '';
+
+  // תווית הבסיס בלי המשך — נוסיף אותו כאלמנט נפרד כדי לסמן שהוא מחושב אוטומטית.
+  const label = travel.legLabel({ ...leg, text: '' });
+  // משך: מחושב → "≈ 15 דק׳" עם רמז שהוא אוטומטי; ידני (computed=false) → כפי שהוזן, בלי ≈.
+  const dur = leg.text
+    ? `<span class="tl-travel__dur${leg.computed ? ' is-est' : ''}"${leg.computed ? ' title="זמן משוער — מחושב אוטומטית לפי המרחק ואמצעי ההגעה"' : ''}>`
+      + `${leg.computed ? '≈ ' : ''}${esc(leg.text)}</span>`
+    : '';
+  const dist = leg.distanceM != null
+    ? `<span class="tl-travel__dist">${esc(travel.formatDistance(leg.distanceM))}</span>`
+    : '';
+
   return `
-    <div class="tl-travel tl-travel--add" data-act="add-travel" data-i="${flatIndex}" role="button" tabindex="0" title="הוספת נסיעה">
-      <div class="tl-travel__rail"><span class="tl-travel__pip tl-travel__pip--add">＋</span></div>
-      <div class="tl-travel__main"><span class="tl-travel__chip tl-travel__chip--add">➕ הוסף נסיעה</span></div>
+    <div class="${cls.join(' ')}"${editable}>
+      <div class="tl-travel__rail"><span class="tl-travel__pip">${esc(leg.emoji)}</span></div>
+      <div class="tl-travel__main">
+        <span class="tl-travel__chip"><span class="tl-travel__label">${esc(label)}${dur ? ` · ${dur}` : ''}</span></span>
+        ${dist}
+        ${leg.note ? `<span class="tl-travel__note">${esc(leg.note)}</span>` : ''}
+      </div>
     </div>`;
 }
 
@@ -99,8 +114,8 @@ function buildGroups(day, canEdit) {
   return { entries, map, order };
 }
 
-function timeline(tour, day, canEdit) {
-  const places = placeLookup(tour);
+function timeline(tour, day, canEdit, placesMap) {
+  const places = placesMap;
   const { entries, map, order } = buildGroups(day, canEdit);
 
   return order.map((period) => {
@@ -110,7 +125,7 @@ function timeline(tour, day, canEdit) {
       ? groupEntries[groupEntries.length - 1].i + 1
       : entries.length;
     const rows = groupEntries.map((e, k) =>
-      travelLeg(e.item, e.i, canEdit) + timelineItem(tour, e, k === groupEntries.length - 1, places, canEdit),
+      travelLeg(tour, day.items, e.i, placesMap, canEdit) + timelineItem(tour, e, k === groupEntries.length - 1, places, canEdit),
     ).join('');
     const empty = (!groupEntries.length && canEdit)
       ? `<div class="tl-empty">גררו לכאן לשיבוץ ב${esc(period || 'חלק היום')}</div>`
@@ -150,6 +165,8 @@ export function render({ tour, route, canEdit }) {
   const idx = Number(route.param) || tour.days[0].index;
   const day = tour.days.find((d) => d.index === idx) || tour.days[0];
   const editable = !!canEdit;
+  // מפת מקומות (name → place) — נבנית פעם אחת לכל render, לחישוב מרחקים וקישורי מקום.
+  const placesMap = travel.placesByName(tour);
 
   const meta = [
     ...(day.transport || []).map((tr) => `<span class="chip">${transportEmoji(tr)} ${esc(tr)}</span>`),
@@ -168,7 +185,7 @@ export function render({ tour, route, canEdit }) {
           ${editable ? `<button type="button" class="day-head__edit" data-act="edit-day" title="עריכת היום" aria-label="עריכת היום">✏️</button>` : ''}
         </div>
         ${editable ? `<div class="day-hint">✋ החזיקו וגררו כדי לשנות סדר, שעה או יום</div>` : ''}
-        ${timeline(tour, day, editable)}
+        ${timeline(tour, day, editable, placesMap)}
       </div>
     </div>`;
 }
@@ -257,9 +274,13 @@ export function mount(ctx, root) {
     document.addEventListener('pointermove', onPointerMove, { passive: false });
     document.addEventListener('pointerup', onPointerUp);
     document.addEventListener('pointercancel', onPointerCancel);
+    // חוסמים סימון טקסט כבר מרגע ההחזקה — אחרת הגרירה "צובעת" את המסך.
+    document.addEventListener('selectstart', blockSelect, true);
     if (onHandle) startDrag();
     else hold.timer = setTimeout(() => { if (hold && !drag) startDrag(); }, HOLD_MS);
   }
+
+  function blockSelect(e) { e.preventDefault(); }
 
   function onPointerMove(e) {
     if (!hold || e.pointerId !== hold.id) return;
@@ -295,6 +316,8 @@ export function mount(ctx, root) {
     document.body.appendChild(indicator);
     layout.classList.add('is-reordering');
     document.body.classList.add('tl-no-select');
+    // ההחזקה לפני תחילת הגרירה עלולה לסמן טקסט — מנקים את הסימון.
+    try { window.getSelection()?.removeAllRanges(); } catch {}
     document.addEventListener('keydown', onKeyDown, true);
     moveClone();
     updateTarget();
@@ -429,6 +452,7 @@ export function mount(ctx, root) {
     document.removeEventListener('pointerup', onPointerUp);
     document.removeEventListener('pointercancel', onPointerCancel);
     document.removeEventListener('keydown', onKeyDown, true);
+    document.removeEventListener('selectstart', blockSelect, true);
     if (drag && source) { try { source.releasePointerCapture(drag.id); } catch {} }
     if (clone) { clone.remove(); clone = null; }
     if (indicator) { indicator.remove(); indicator = null; }

@@ -12,6 +12,7 @@
 import * as store from './store.js';
 import * as auth from './auth.js';
 import { CATEGORIES, iconFor, pid, slugify, PERIODS, TRAVEL_MODES, travelLabel, fmtWeekday, fmtDateShort } from './util.js';
+import { estimateFor, formatDistance } from './travel.js';
 
 // ---- Wikimedia Commons (client-side, CORS-friendly) --------------------------
 const COMMONS = (q) =>
@@ -592,9 +593,15 @@ function resolveDay(tourId, dayIndex) {
 
 // Shared travel controls (mode chips + duration/line/note). Used by the travel
 // editor and, embedded, inside the activity editor. values() → travel obj | null.
+//
+// המשך נגזר אוטומטית מהגיאוגרפיה + האמצעי (ראו travel.js): שדה "משך" נשאר ריק =
+// מצב "אוטומטי" (הציר מחשב לבד ולא נשמר משך מיושן); הקלדת ערך = "ידני" (manual).
+// opts.estimate?(mode) → {minutes, text, distanceM}|null — הערכה חיה לפי האמצעי
+// הנבחר; חסר/מחזיר null ⇒ אין קואורדינטות (או פעילות חדשה) ומציגים הודעה מתאימה.
 function buildTravelControls(travel, opts = {}) {
   const t = travel || {};
   const allowNone = opts.allowNone !== false;
+  const estimate = typeof opts.estimate === 'function' ? opts.estimate : null;
   let selected = TRAVEL_MODES[t.mode] ? t.mode
     : (TRAVEL_MODES[opts.defaultMode] ? opts.defaultMode : null);
 
@@ -613,13 +620,65 @@ function buildTravelControls(travel, opts = {}) {
     chips.appendChild(b);
   });
 
-  const durationInput = el('input', { class: 'ed-input', type: 'text', value: t.duration || '', placeholder: 'למשל: 12 דק׳' });
+  // "משך" מוקדם רק כשהוזן ידנית — מקטע אוטומטי מוצג ריק (placeholder עם ההערכה).
+  const isManualInit = !!(t.manual && t.duration);
+  const durationInput = el('input', { class: 'ed-input', type: 'text', value: isManualInit ? String(t.duration) : '', placeholder: 'אוטומטי' });
+  durationInput.id = 'ed-f-' + (++uid);
   const lineInput = el('input', { class: 'ed-input', type: 'text', value: t.line || '', placeholder: 'למשל: 2 / M1', dir: 'ltr' });
   const noteInput = el('input', { class: 'ed-input', type: 'text', value: t.note || '', placeholder: 'הערה (אופציונלי)' });
+
+  // תג "אוטומטי / ידני" ליד תווית המשך.
+  const badge = el('span', { class: 'ed-travel-badge' }, ['אוטומטי']);
+  const durLabel = el('label', { class: 'ed-label ed-label--row', for: durationInput.id }, ['משך', badge]);
+
+  // שורת הערכה חיה + כפתור "חשב אוטומטית".
+  const estVal = el('span', { class: 'ed-travel-est__val' }, ['']);
+  const autoBtn = el('button', {
+    type: 'button', class: 'ed-travel-est__auto', title: 'נקה את המשך הידני וחזור לחישוב אוטומטי',
+    onclick: () => { durationInput.value = ''; refreshEst(); durationInput.focus(); },
+  }, ['↻ חשב אוטומטית']);
+  const estLine = el('div', { class: 'ed-travel-est', 'aria-live': 'polite' }, [estVal, autoBtn]);
+
+  const durField = el('div', { class: 'ed-field' }, [durLabel, durationInput, estLine]);
   const rows = el('div', { class: 'ed-travel__rows' }, [
-    row2(field('משך', durationInput), field('קו', lineInput)),
+    row2(durField, field('קו', lineInput)),
     field('הערה', noteInput),
   ]);
+
+  function currentEstimate() {
+    if (!estimate || selected == null) return null;
+    try { return estimate(selected); } catch { return null; }
+  }
+  // מרענן את התג, ה-placeholder ושורת ההערכה לפי האמצעי הנבחר והמצב (אוטו/ידני).
+  function refreshEst() {
+    const manual = durationInput.value.trim() !== '';
+    badge.textContent = manual ? 'ידני' : 'אוטומטי';
+    badge.classList.toggle('is-manual', manual);
+    badge.classList.toggle('is-auto', !manual);
+    autoBtn.disabled = !manual || selected == null;
+
+    if (selected == null) { estLine.hidden = true; return; }
+    estLine.hidden = false;
+    estLine.classList.toggle('is-overridden', manual);
+
+    if (!estimate) {
+      estVal.textContent = 'זמן הנסיעה יחושב אוטומטית לאחר שמירת הפעילות';
+      estLine.dataset.state = 'pending';
+      if (!manual) durationInput.placeholder = 'אוטומטי';
+      return;
+    }
+    const est = currentEstimate();
+    if (!est || est.minutes == null) {
+      estVal.textContent = 'לא ניתן לחשב אוטומטית — אפשר להזין ידנית';
+      estLine.dataset.state = 'none';
+      if (!manual) durationInput.placeholder = 'אוטומטי (אין קואורדינטות)';
+    } else {
+      const dist = est.distanceM != null ? ' · ' + formatDistance(est.distanceM) : '';
+      estVal.textContent = `זמן משוער: ≈ ${est.text}${dist}`;
+      estLine.dataset.state = 'ok';
+      if (!manual) durationInput.placeholder = `אוטומטי: ≈ ${est.text}`;
+    }
+  }
 
   function updateEnabled() {
     const dis = selected == null;
@@ -634,7 +693,9 @@ function buildTravelControls(travel, opts = {}) {
       btns[key].setAttribute('aria-checked', on ? 'true' : 'false');
     });
     updateEnabled();
+    refreshEst();
   }
+  durationInput.addEventListener('input', refreshEst);
   setMode(selected);
 
   const wrap = el('div', { class: 'ed-travel' }, [
@@ -648,9 +709,12 @@ function buildTravelControls(travel, opts = {}) {
     values: () => {
       if (selected == null) return null;
       const out = { mode: selected };
-      const d = durationInput.value.trim(); if (d) out.duration = d;
       const l = lineInput.value.trim(); if (l) out.line = l;
       const n = noteInput.value.trim(); if (n) out.note = n;
+      // משך ריק ⇒ אוטומטי: לא שומרים duration/manual (הציר מחשב לבד).
+      // משך שהוקלד ⇒ עדיפות ידנית: manual:true + הטקסט כפי שהוא.
+      const d = durationInput.value.trim();
+      if (d) { out.manual = true; out.duration = d; }
       return out;
     },
   };
@@ -735,7 +799,15 @@ export function openDayItemEditor(opts) {
     },
   }, ['🖼️ הצע תמונה']);
 
-  const travelControls = buildTravelControls(item.travel, { allowNone: true });
+  // הערכה חיה: תמיד לפי המיקום הנוכחי של הפעילות (dayIndex/itemIndex) מהחנות.
+  // לפעילות חדשה (בלי אינדקס) אין עדיין קואורדינטות משלה — נסתיר את ההערכה עד לשמירה.
+  const travelEstimate = isEdit
+    ? (mode) => {
+        const c = resolveDay(tourId, dayIndex);
+        return c ? estimateFor(c.tour, c.day.items || [], itemIndex, mode) : null;
+      }
+    : null;
+  const travelControls = buildTravelControls(item.travel, { allowNone: true, estimate: travelEstimate });
   const summaryKids = [el('span', {}, ['🚕 נסיעה לפעילות הזו'])];
   if (item.travel) summaryKids.push(el('span', { class: 'ed-travel-embed__cur' }, [travelLabel(item.travel)]));
   const details = el('details', { class: 'ed-travel-embed' }, [
@@ -816,7 +888,10 @@ export function openTravelEditor(opts) {
     console.warn('[edit] openTravelEditor: invalid itemIndex', itemIndex); return;
   }
   const item = items[itemIndex];
-  const controls = buildTravelControls(item.travel, { defaultMode: item.travel ? item.travel.mode : 'walk' });
+  const controls = buildTravelControls(item.travel, {
+    defaultMode: item.travel ? item.travel.mode : 'walk',
+    estimate: (mode) => estimateFor(ctx.tour, ctx.day.items || [], itemIndex, mode),
+  });
 
   const body = el('div', { class: 'ed-form' }, [
     el('div', { class: 'ed-travel__lead' }, [`איך מגיעים אל: ${item.title || 'הפעילות'}`]),

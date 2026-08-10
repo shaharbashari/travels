@@ -10,7 +10,7 @@
 | `id` | string | ✅ | מזהה ייחודי, kebab-case, זהה לשם הקובץ. |
 | `status?` | `'upcoming'\|'active'\|'past'` | | מחושב אוטומטית מהתאריכים; אפשר לדרוס. |
 | `order?` | number | | סדר ברשימת הטיולים (קטן→גדול). |
-| `destination` | `{city, country, flag?}` | ✅ | יעד הטיול. `flag` = אימוג׳י דגל. |
+| `destination` | `{city, country, flag?, lat?, lng?}` | ✅ | יעד הטיול. `flag` = אימוג׳י דגל. `lat`/`lng` — למזג אוויר חי. |
 | `title` | string | ✅ | שם הטיול (כותרת ראשית). |
 | `subtitle?` | string | | תת-כותרת קצרה. |
 | `dates` | `{start, end}` | ✅ | פורמט `'YYYY-MM-DD'`. |
@@ -26,6 +26,7 @@
 | `transport?` | `TransportSection[]` | | מדריך תחבורה. |
 | `transportTips?` | string[] | | טיפים לתחבורה. |
 | `hero?` | string | | כתובת תמונת נושא (URL) — רקע ה-hero ובכרטיס הטיול. |
+| `airport?` | `{name?, lat, lng}` | | שדה התעופה של היעד — משמש לחישוב אוטומטי של זמני נסיעה מ/אל השדה. |
 | `money?` | `{currency, rate?, cards?, tipping?, notes?}` | | כספים ומטבע. |
 | `connectivity?` | string[] | | טיפים לתקשורת/אינטרנט. |
 | `budget?` | `{label, value}[]` | | תקציב יומי משוער. |
@@ -90,15 +91,21 @@
 ```
 { period?:'בוקר'|'צהריים'|'אחר הצהריים'|'ערב',
   time?:'HH:MM', emoji?, title, desc?, place?,
-  travel?: { mode:TravelMode, duration:string, line?:string, note?:string } }
+  travel?: { mode:TravelMode, duration?:string, line?:string, note?:string, manual?:boolean } }
 ```
 `period` מקבץ פריטים בציר הזמן. `place` — שם שמתאים ל-`name` של Place ויוצר קישור ל"מה עושים".
 
 `travel` מתאר את הדרך **אל** הפעילות מהפעילות הקודמת:
 - `mode` — אחד מהמפתחות המדויקים: `walk`, `metro`, `tram`, `bus`, `taxi`, `car`, `boat`, `train`, `funicular`, `bike`.
-- `duration` — משך קצר בעברית, למשל `'10 דק׳'` או `'25 דק׳'`.
+- `duration?` — **בדרך כלל לא צריך למלא!** משך הנסיעה מחושב אוטומטית לפי המרחק בין הקואורדינטות של שתי הפעילויות ולפי `mode` (ראו `assets/js/travel.js`), ולכן הוא מתעדכן לבד כשמשנים סדר, מעבירים ליום אחר או מחליפים אמצעי תחבורה.
+- `manual?` — `true` רק כשהמשתמש הזין משך ידנית; אז `duration` מוצג כפי שהוא ולא מחושב מחדש.
 - `line?` — מספר קו או מזהה מסלול, למשל `'2'`, `'M1'`, `'16'` או `'100E'`; משמיטים כשלא רלוונטי.
 - `note?` — טיפ נסיעה קצר ושימושי.
+
+> החישוב האוטומטי דורש קואורדינטות: `lat`/`lng` על ה-Place המקושר (או על הפעילות עצמה).
+> אזכור של המלון או של שדה התעופה בכותרת הפעילות מזהה אותם אוטומטית (`hotel`, `airport`).
+> כשאין קואורדינטות — מוצג הטקסט שב-`duration`, אם קיים.
+> אם לפעילות אין `travel` כלל אבל יש קואורדינטות לשתי הפעילויות והמרחק משמעותי — מוצע מקטע נסיעה אוטומטי.
 
 ### Place
 ```

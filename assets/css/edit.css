@@ -204,6 +204,43 @@
 .ed-mode.is-on { background: var(--grad-danube); color: #fff; border-color: transparent; box-shadow: var(--shadow); }
 .ed-mode__emoji { font-size: 1.15rem; line-height: 1; }
 
+/* Auto/manual duration: label badge, live estimate line + "recompute" control */
+.ed-label--row { display: inline-flex; align-items: center; gap: 8px; }
+.ed-travel-badge {
+  font-size: .68rem; font-weight: 800; line-height: 1;
+  padding: 3px 8px; border-radius: var(--pill);
+  border: 1.5px solid transparent; letter-spacing: .01em;
+}
+.ed-travel-badge.is-auto {
+  color: var(--danube-deep);
+  background: color-mix(in srgb, var(--danube) 16%, #fff);
+  border-color: color-mix(in srgb, var(--danube) 30%, #fff);
+}
+.ed-travel-badge.is-manual {
+  color: var(--gold-deep);
+  background: color-mix(in srgb, var(--gold) 22%, #fff);
+  border-color: color-mix(in srgb, var(--gold) 42%, #fff);
+}
+.ed-travel-est {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  font-size: .78rem; color: var(--ink-soft);
+}
+.ed-travel-est[hidden] { display: none; }
+.ed-travel-est__val { min-width: 0; }
+.ed-travel-est[data-state="none"] .ed-travel-est__val,
+.ed-travel-est[data-state="pending"] .ed-travel-est__val { color: var(--ink-faint); }
+.ed-travel-est.is-overridden .ed-travel-est__val { opacity: .6; text-decoration: line-through; }
+.ed-travel-est__auto {
+  margin-inline-start: auto; flex: none;
+  font: inherit; font-size: .76rem; font-weight: 700; cursor: pointer;
+  color: var(--danube-deep); background: transparent;
+  border: 1.5px solid color-mix(in srgb, var(--danube) 34%, #fff);
+  border-radius: var(--pill); padding: 4px 11px;
+  transition: background .14s ease, color .14s ease, border-color .14s ease, opacity .14s ease;
+}
+.ed-travel-est__auto:hover { background: color-mix(in srgb, var(--danube) 14%, #fff); }
+.ed-travel-est__auto:disabled { opacity: .45; cursor: default; border-color: var(--line); color: var(--ink-faint); }
+
 .ed-travel-embed {
   border: 1.5px dashed color-mix(in srgb, var(--danube) 40%, #fff);
   border-radius: var(--r); background: var(--surface-2); overflow: hidden;

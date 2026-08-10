@@ -3,6 +3,65 @@
 // ============================================================================
 import { esc, fmtRange, fmtDateShort, daysUntil, nights, countUp, PALETTE, CATEGORIES, thumb } from '../util.js';
 import { skyline } from '../svg.js';
+import { fetchWeather, tourCoords, forDate, coversTrip, describe, label } from '../weather.js';
+
+function tempText(value) {
+  return Number.isFinite(value) ? `${Math.round(value)}°` : '—';
+}
+
+function rainText(value) {
+  return Number.isFinite(value) ? `${Math.round(value)}%` : '—';
+}
+
+function seasonalWeather(tour, loading = false) {
+  return `
+    <span class="glyph" aria-hidden="true">☀️</span>
+    <div class="qcard__label">מזג אוויר · ${esc(tour.weather?.month || '')}</div>
+    ${loading ? `
+      <div class="weather-home__loading" role="status">
+        <span class="weather-skeleton weather-skeleton--home-temp"></span>
+        <span class="weather-skeleton weather-skeleton--home-copy"></span>
+        <span class="weather-loading__text">טוען מזג אוויר חי…</span>
+      </div>` : ''}
+    <div class="weather-home__seasonal">
+      <div class="qcard__value">${esc(tour.weather?.day || '')} <span class="weather-home__unit">ביום</span></div>
+      <div class="qcard__sub">${esc(tour.weather?.night || '')} בלילה · ${esc(tour.weather?.summary || '')}</div>
+    </div>`;
+}
+
+function liveWeather(tour, data) {
+  const current = data?.current;
+  const firstDay = coversTrip(data, tour) ? forDate(data, tour.dates?.start) : null;
+  const city = tour.destination?.city || tour.title || 'היעד';
+  const seasonal = `ממוצע ל${tour.weather?.month || 'עונה'}: ${tour.weather?.day || '—'} ביום · ${tour.weather?.night || '—'} בלילה`;
+
+  if (firstDay) {
+    const condition = describe(firstDay.code);
+    return `
+      <span class="glyph" aria-hidden="true">${esc(condition.emoji)}</span>
+      <div class="qcard__label">תחזית ליום הראשון · ${esc(tour.weather?.month || '')}</div>
+      <div class="weather-home__main">
+        <span class="weather-home__temp" dir="ltr">${esc(`${tempText(firstDay.max)} / ${tempText(firstDay.min)}`)}</span>
+        <span class="weather-home__condition">${esc(`${condition.emoji} ${condition.he}`)}</span>
+      </div>
+      <div class="weather-home__caption">${esc(fmtDateShort(firstDay.date))} · סיכוי לגשם ${esc(rainText(firstDay.rain))}</div>
+      ${current ? `<div class="qcard__sub weather-home__now">עכשיו ב${esc(city)} · ${esc(label(current))}</div>` : ''}
+      <div class="qcard__sub weather-home__seasonal-line">${esc(seasonal)}</div>`;
+  }
+
+  if (!current) return seasonalWeather(tour);
+  const condition = describe(current.code);
+  return `
+    <span class="glyph" aria-hidden="true">${esc(condition.emoji)}</span>
+    <div class="qcard__label">מזג אוויר · ${esc(tour.weather?.month || '')}</div>
+    <div class="weather-home__main">
+      <span class="weather-home__temp" dir="ltr">${esc(tempText(current.temp))}</span>
+      <span class="weather-home__condition">${esc(`${condition.emoji} ${condition.he}`)}</span>
+    </div>
+    <div class="weather-home__caption">עכשיו ב${esc(city)}</div>
+    <div class="qcard__sub weather-home__seasonal-line">${esc(seasonal)}</div>
+    <div class="qcard__sub">${esc(tour.weather?.summary || '')}</div>`;
+}
 
 function countdownBlock(tour, status) {
   const dleft = daysUntil(tour.dates?.start);
@@ -86,11 +145,8 @@ export function render({ tour, status }) {
     <div class="quickgrid stagger">
       ${out ? flightCard(out) : ''}
       ${ret ? flightCard(ret) : ''}
-      <div class="qcard">
-        <span class="glyph">☀️</span>
-        <div class="qcard__label">מזג אוויר · ${esc(tour.weather?.month || '')}</div>
-        <div class="qcard__value">${esc(tour.weather?.day || '')} <span style="font-size:.9rem;color:var(--ink-soft)">ביום</span></div>
-        <div class="qcard__sub">${esc(tour.weather?.night || '')} בלילה · ${esc(tour.weather?.summary || '')}</div>
+      <div class="qcard weather-home weather-is-loading" data-weather="home" aria-live="polite" aria-busy="true">
+        ${seasonalWeather(tour, true)}
       </div>
       <a class="qcard qcard--wide" href="${esc(tour.hotel?.mapUrl || '#')}" target="_blank" rel="noopener">
         <span class="glyph">🏨</span>
@@ -108,6 +164,31 @@ export function render({ tour, status }) {
   `;
 }
 
-export function mount(ctx, root) {
-  root.querySelectorAll('[data-count]').forEach((el) => countUp(el, Number(el.dataset.count)));
+export async function mount(ctx, root) {
+  try {
+    root.querySelectorAll('[data-count]').forEach((el) => countUp(el, Number(el.dataset.count)));
+  } catch {}
+
+  const host = root?.querySelector?.('[data-weather="home"]');
+  if (!host) return;
+  const showFallback = () => {
+    try {
+      host.querySelector('.weather-home__loading')?.remove();
+      host.classList.remove('weather-is-loading');
+      host.removeAttribute('aria-busy');
+    } catch {}
+  };
+
+  try {
+    const coords = tourCoords(ctx?.tour);
+    if (!coords) { showFallback(); return; }
+    const data = await fetchWeather(coords.lat, coords.lng);
+    if (!data) { showFallback(); return; }
+    if (!host.isConnected) return;
+    host.innerHTML = liveWeather(ctx.tour, data);
+    host.classList.remove('weather-is-loading');
+    host.removeAttribute('aria-busy');
+  } catch {
+    showFallback();
+  }
 }
