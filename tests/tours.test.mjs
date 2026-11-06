@@ -104,3 +104,26 @@ test('place-card map links use each tour destination', () => {
     }
   }
 });
+
+test('winter itinerary adds cultural days while keeping the Friday meeting and short walks', () => {
+  const friday = bucharest.days.find((day) => day.date === '2027-01-29');
+  const meeting = friday.items.find((item) => item.title === 'הגעה ל-ParkLake לפי שעת התיאום');
+  assert.ok(meeting, 'The fixed ParkLake meeting must remain on Friday');
+  assert.equal(meeting.place, 'ParkLake Shopping Center');
+  assert.equal(meeting.time, undefined, 'Do not invent a time for the privately coordinated meeting');
+  assert.equal(friday.items.indexOf(meeting), 1, 'Sightseeing must not displace the morning meeting');
+
+  const places = new Map(bucharest.places.map((place) => [place.name, place]));
+  for (const day of bucharest.days) {
+    const culturalVisits = day.items.filter((item) => places.get(item.place)?.category === 'museums');
+    assert.ok(culturalVisits.length, `Day ${day.index} needs an indoor cultural anchor, not only shopping and food`);
+    for (const [index, item] of day.items.entries()) {
+      if (item.travel?.mode === 'walk') {
+        const leg = legFor(bucharest, day.items, index);
+        assert.ok(leg?.distanceM < 700, `Use a taxi rather than a long winter walk to ${item.title}`);
+      }
+    }
+  }
+  const saturday = bucharest.days.find((day) => day.date === '2027-01-30');
+  assert.ok(!saturday.items.some((item) => item.place === 'AFI Cotroceni'), 'A second mall must not remain the main Saturday activity');
+});
