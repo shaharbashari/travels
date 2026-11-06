@@ -8,11 +8,13 @@
 // ============================================================================
 
 import budapest2026 from './budapest-2026.js';
+import bucharest2027 from './bucharest-2027.js';
 // import next2027 from './next-2027.js';   // ⬅️ טיול עתידי לדוגמה
 
 /** כל הטיולים באתר. הסדר נקבע לפי השדה `order` (וקטן→גדול). */
 export const tours = [
   budapest2026,
+  bucharest2027,
   // next2027,
 ];
 

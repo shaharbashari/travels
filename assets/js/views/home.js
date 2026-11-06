@@ -129,7 +129,7 @@ export function render({ tour, status }) {
 
   return `
     <section class="hero">
-      ${skyline({ reflection: true })}
+      ${tour.destination?.city === 'בודפשט' ? skyline({ reflection: true }) : ''}
       ${tour.hero ? `<img class="hero__photo" src="${esc(tour.hero)}" alt="" decoding="async" referrerpolicy="no-referrer" onload="this.classList.add('is-loaded')" onerror="this.remove()">` : ''}
       <div class="hero__scrim"></div>
       <div class="hero__inner">

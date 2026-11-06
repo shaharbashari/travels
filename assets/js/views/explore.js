@@ -3,8 +3,8 @@
 // ============================================================================
 import { esc, CATEGORIES, thumb } from '../util.js';
 
-const gmaps = (name) =>
-  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ', Budapest')}`;
+const gmaps = (name, city) =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([name, city].filter(Boolean).join(', '))}`;
 
 function countByCat(tour) {
   const counts = {};
@@ -50,7 +50,7 @@ function placeCard(tour, p) {
           ${p.hours ? `<span class="chip" style="padding:4px 11px;font-size:.78rem">🕒 ${esc(p.hours)}</span>` : ''}
           ${p.price ? `<span class="chip" style="padding:4px 11px;font-size:.78rem">💰 ${esc(p.price)}</span>` : ''}
           ${p.day ? `<span class="chip" style="padding:4px 11px;font-size:.78rem">יום ${p.day}</span>` : ''}
-          <a class="place-link" href="${gmaps(p.name)}" target="_blank" rel="noopener">🗺️ במפות</a>
+          <a class="place-link" href="${esc(gmaps(p.name, tour.destination?.city))}" target="_blank" rel="noopener">🗺️ במפות</a>
         </div>
         ${p.tip ? `<div class="place-tip">💡 ${esc(p.tip)}</div>` : ''}
       </div>

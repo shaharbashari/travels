@@ -249,7 +249,7 @@ export function render({ tour }) {
       <div class="info-card"><ul class="checklist">${tour.beforeYouGo.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>
     `) : ''}
 
-    ${(tour.phrasebook || []).length ? section('שיחון · הונגרית', '🗣️', `
+    ${(tour.phrasebook || []).length ? section(`שיחון · ${tour.phrasebookLanguage || 'הונגרית'}`, '🗣️', `
       <div class="info-card">
         ${tour.phrasebook.map((p) => `
           <div class="phrase-row">

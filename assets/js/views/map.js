@@ -1,10 +1,10 @@
 // ============================================================================
-//  views/map.js — מפת בודפשט אינטראקטיבית (Leaflet + OpenStreetMap)
+//  views/map.js — מפת היעד אינטראקטיבית (Leaflet + OpenStreetMap)
 // ============================================================================
 import { esc, CATEGORIES } from '../util.js';
 
-const gmaps = (name) =>
-  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ', Budapest')}`;
+const gmaps = (name, city) =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([name, city].filter(Boolean).join(', '))}`;
 
 /** אוסף כל הנקודות עם קואורדינטות (המלון + מקומות). */
 function points(tour) {
@@ -47,7 +47,8 @@ export function mount({ tour }, root) {
 
   const pts = points(tour);
   const map = L.map(el, { scrollWheelZoom: false, zoomControl: true })
-    .setView([47.4979, 19.0402], 13);
+    .setView([tour.destination?.lat ?? tour.hotel?.lat ?? 47.4979,
+      tour.destination?.lng ?? tour.hotel?.lng ?? 19.0402], 13);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap', maxZoom: 19,
@@ -65,7 +66,7 @@ export function mount({ tour }, root) {
         <span style="color:#6c6156;font-size:.85em">${esc(p.catLabel || '')}</span>
         ${p.desc ? `<br><span style="font-size:.85em">${esc(p.desc)}</span>` : ''}
         ${p.id ? `<br><a href="#/t/${encodeURIComponent(tour.id)}/place/${encodeURIComponent(p.id)}">פרטים ›</a>` : ''}
-        <br><a href="${gmaps(p.name)}" target="_blank" rel="noopener">פתח במפות ›</a>
+        <br><a href="${esc(gmaps(p.name, tour.destination?.city))}" target="_blank" rel="noopener">פתח במפות ›</a>
       </div>`);
     markers.push(m);
     bounds.push([p.lat, p.lng]);

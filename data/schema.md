@@ -36,6 +36,7 @@
 | `extraInfo?` | `ExtraInfoSection[]` | | מדריכי עומק נוספים לעמוד המידע: שכונות, אוכל, טיולי יום וטיפים. |
 | `photoCredits?` | `{t, by, lic, src}[]` | | קרדיטים לתמונות (חובה ל-CC-BY/CC-BY-SA). |
 | `phrasebook?` | `Phrase[]` | | שיחון. |
+| `phrasebookLanguage?` | string | | שם שפת השיחון בעברית; ברירת המחדל הונגרית לתאימות לטיול בודפשט. |
 | `days` | `Day[]` | ✅ | המסלול היומי. |
 | `places?` | `Place[]` | | מקומות ל"מה עושים" ולמפה. |
 

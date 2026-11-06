@@ -79,6 +79,7 @@
  * @property {ExtraInfoSection[]} [extraInfo] מדריכי עומק נוספים לעמוד המידע
  * @property {{t:string,by:string,lic:string,src:string}[]} [photoCredits]  קרדיטים לתמונות
  * @property {Phrase[]} [phrasebook]
+ * @property {string} [phrasebookLanguage] שם שפת השיחון בעברית
  * @property {Day[]} days
  * @property {Place[]} [places]
  */
