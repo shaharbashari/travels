@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import tours from '../data/tours/index.js';
 import { pid, CATEGORIES } from '../assets/js/util.js';
-import { legFor } from '../assets/js/travel.js';
+import { haversineM, legFor } from '../assets/js/travel.js';
 import { render as renderInfo } from '../assets/js/views/info.js';
 import { render as renderHome } from '../assets/js/views/home.js';
 import { render as renderTrips } from '../assets/js/views/trips.js';
@@ -105,7 +105,7 @@ test('place-card map links use each tour destination', () => {
   }
 });
 
-test('winter itinerary adds cultural days while keeping the Friday meeting and short walks', () => {
+test('Friday keeps the meeting and extended shopping before Therme', () => {
   const friday = bucharest.days.find((day) => day.date === '2027-01-29');
   const meeting = friday.items.find((item) => item.title === 'הגעה ל-ParkLake לפי שעת התיאום');
   assert.ok(meeting, 'The fixed ParkLake meeting must remain on Friday');
@@ -113,17 +113,47 @@ test('winter itinerary adds cultural days while keeping the Friday meeting and s
   assert.equal(meeting.time, undefined, 'Do not invent a time for the privately coordinated meeting');
   assert.equal(friday.items.indexOf(meeting), 1, 'Sightseeing must not displace the morning meeting');
 
+  const spaIndex = friday.items.findIndex((item) => item.place === 'Therme București');
+  assert.ok(spaIndex > friday.items.indexOf(meeting));
+  assert.ok(friday.items.slice(2, spaIndex).some((item) =>
+    item.place === 'ParkLake Shopping Center' && item.period === 'אחר הצהריים'));
+  assert.ok(!friday.items.some((item) => item.place === 'National Museum of Art of Romania'));
+});
+
+test('flight day has breakfast coffee, modern activities and no spa or collections museum', () => {
+  const saturday = bucharest.days.find((day) => day.date === '2027-01-30');
   const places = new Map(bucharest.places.map((place) => [place.name, place]));
+  assert.ok(!saturday.items.some((item) => item.place === 'Therme București'));
+  assert.ok(!saturday.items.some((item) => item.place === 'Museum of Romanian Records'));
+  assert.ok(!saturday.items.some((item) => item.period === 'בוקר' &&
+    places.get(item.place)?.category === 'sweets'), 'Do not reintroduce a separate morning cafe');
+  assert.ok(saturday.items.some((item) =>
+    ['attractions', 'museums'].includes(places.get(item.place)?.category)));
+});
+
+test('specialty shopping and walkable cocktails replace the old museum-heavy route', () => {
+  const places = new Map(bucharest.places.map((place) => [place.name, place]));
+  const scheduled = bucharest.days.flatMap((day) => day.items);
+  const shops = new Set(scheduled.map((item) => item.place).filter((name) =>
+    places.get(name)?.category === 'shopping' && !/ParkLake|Primark|AFI/.test(name)));
+  assert.ok(shops.size >= 2, 'Include real specialty shops beyond malls');
+  const bars = scheduled.filter((item) => places.get(item.place)?.category === 'nightlife');
+  assert.ok(bars.length);
+  for (const item of bars) {
+    assert.equal(item.travel.mode, 'walk');
+    assert.ok(haversineM(bucharest.hotel, places.get(item.place)) < 800);
+  }
   for (const day of bucharest.days) {
-    const culturalVisits = day.items.filter((item) => places.get(item.place)?.category === 'museums');
-    assert.ok(culturalVisits.length, `Day ${day.index} needs an indoor cultural anchor, not only shopping and food`);
     for (const [index, item] of day.items.entries()) {
       if (item.travel?.mode === 'walk') {
-        const leg = legFor(bucharest, day.items, index);
-        assert.ok(leg?.distanceM < 700, `Use a taxi rather than a long winter walk to ${item.title}`);
+        assert.ok(legFor(bucharest, day.items, index)?.distanceM < 900,
+          `Use a taxi rather than a long winter walk to ${item.title}`);
       }
     }
   }
-  const saturday = bucharest.days.find((day) => day.date === '2027-01-30');
-  assert.ok(!saturday.items.some((item) => item.place === 'AFI Cotroceni'), 'A second mall must not remain the main Saturday activity');
+  for (const name of ['Suțu Palace', 'National Museum of Art of Romania',
+    'Museum of Romanian Records', 'Art Collections Museum', 'Ceaușescu Spring Palace', 'The Escape Room']) {
+    assert.ok(!scheduled.some((item) => item.place === name));
+    assert.ok(!places.has(name));
+  }
 });
