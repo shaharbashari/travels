@@ -120,6 +120,118 @@ test('Friday keeps the meeting and extended shopping before Therme', () => {
   assert.ok(!friday.items.some((item) => item.place === 'National Museum of Art of Romania'));
 });
 
+test('Primark and visitor-facing copy describe the trip, not previous revisions', () => {
+  const friday = bucharest.days.find((day) => day.date === '2027-01-29');
+  const shopping = friday.items.find((item) => item.place === 'Primark ParkLake');
+  const primark = bucharest.places.find((place) => place.name === shopping.place);
+  assert.ok(shopping.desc.includes('אחרי הפגישה'));
+  assert.ok(primark.desc.includes('בנחת'));
+  assert.ok(renderPlace({ tour: bucharest, place: primark }).includes(primark.address));
+  const copy = JSON.stringify(bucharest);
+  for (const leftover of ['אין מגבלת 45 דקות', 'בלי מגבלת 45 דקות',
+    'בלי להקציב רק 45 דקות', 'הגרסה החדשה', 'בתוכנית החדשה',
+    'מוזיאון אמנות שמחכה', 'מוזיאון אמנות שמתחבא', 'בלי מוזיאון באמצע',
+    'בלי להתפנות למוזיאון באמצע', 'נבחר במקום בר הגג', 'הספא עובר לשישי',
+    'הגלריה אינה המלצה', 'לא ביקור בגלריה', 'לא הוכח סניף ParkLake',
+    'לא על מרכז תצוגת המפה']) {
+    assert.ok(!copy.includes(leftover), `Leftover edit commentary: ${leftover}`);
+  }
+});
+
+test('Red Goblin is absent from recommendations, directions and rendered pages', () => {
+  for (const copy of [JSON.stringify(bucharest),
+    renderHome({ tour: bucharest, status: 'upcoming' }),
+    renderInfo({ tour: bucharest }),
+    renderExplore({ tour: bucharest, route: { param: 'all' } }),
+    ...bucharest.places.map((place) => renderPlace({ tour: bucharest, place }))]) {
+    assert.ok(!/Red Goblin|redgoblin|רד גובלין|Știrbei Vodă 4/i.test(copy));
+  }
+});
+
+test('requested venues and the hotel-first airport transfer remain intact', () => {
+  assert.deepEqual(bucharest.dates, { start: '2027-01-28', end: '2027-01-30' });
+  assert.equal(bucharest.hotel.name, 'Hilton Garden Inn Bucharest Old Town');
+  assert.equal(bucharest.hotel.address, 'Strada Doamnei 12, Sector 3, Bucharest, Romania');
+  const scheduled = bucharest.days.flatMap((day) => day.items);
+  for (const name of ['MINISO ParkLake', 'OTOTO Amzei', 'Museum of Senses', 'Sippers']) {
+    assert.ok(bucharest.places.some((place) => place.name === name));
+    assert.ok(scheduled.some((item) => item.place === name));
+  }
+  const saturday = bucharest.days.find((day) => day.date === '2027-01-30');
+  const transferIndex = saturday.items.findIndex((item) =>
+    item.title === 'יציאה מהמלון לשדה התעופה אוטופני');
+  assert.ok(transferIndex > 0);
+  assert.equal(saturday.items[transferIndex].time, '17:00');
+  assert.equal(saturday.items[transferIndex].travel.mode, 'taxi');
+  assert.equal(saturday.items[transferIndex - 1].time, '16:30');
+  assert.ok(saturday.items[transferIndex - 1].title.includes('מהמלון'));
+  assert.equal(bucharest.flights.find((flight) => flight.direction === 'return').depart, '21:45');
+  assert.ok(bucharest.places.some((place) => place.name === 'AlbAlb'));
+  assert.ok(bucharest.places.some((place) => place.name === 'MINA Museum'));
+});
+
+test('new alternatives have rich, sourced place pages in the existing clusters', () => {
+  const tour = structuredClone(bucharest);
+  tour.places.forEach((place) => { place.id = pid(place.name); });
+  const expected = [
+    ['Romanian Boutique', 'www.romanianboutique.ro', { lat: 44.430958, lng: 26.104041 }],
+    ['LEGO Certified Store ParkLake', 'brickdepot.ro', { lat: 44.4206655, lng: 26.149631 }],
+    ['ProfiArt AFI Cotroceni', 'www.aficotroceni.ro', { lat: 44.4303333, lng: 26.0522045 }],
+    ['TRICKSHOT AFI Cotroceni', 'trickshot.ro', { lat: 44.4303333, lng: 26.0522045 }],
+  ];
+  for (const [name, sourceHost, coords] of expected) {
+    const place = tour.places.find((entry) => entry.name === name);
+    assert.ok(place, `Missing new alternative: ${name}`);
+    assert.deepEqual({ lat: place.lat, lng: place.lng }, coords);
+    assert.ok(place.address && place.hours && place.price && place.long);
+    assert.ok(place.tips.length >= 2 && place.tags.length >= 2);
+    assert.equal(place.rating, undefined, `Do not invent a rating for ${name}`);
+    assert.ok(/לבחירה|חלופה/.test(place.badge));
+    assert.ok(place.links.some((link) =>
+      link.type === 'website' && new URL(link.url).hostname === sourceHost));
+    const html = renderPlace({ tour, place });
+    assert.ok(html.includes(place.address));
+    assert.ok(html.includes('detail-mapwrap'));
+    assert.ok(html.includes('detail-tips'));
+    for (const link of place.links) {
+      assert.equal(new URL(link.url).protocol, 'https:');
+      assert.ok(html.includes(link.url.replaceAll('&', '&amp;')));
+    }
+  }
+  const boutique = tour.places.find((place) => place.name === 'Romanian Boutique');
+  assert.ok(haversineM(tour.hotel, boutique) < 500, 'The replacement must be in the hotel walking cluster');
+  assert.ok(boutique.links.some((link) => link.url.includes('query_place_id=ChIJDzU6XD7_sUAR7mllnhXAmNA')));
+  for (const name of ['ProfiArt AFI Cotroceni', 'TRICKSHOT AFI Cotroceni']) {
+    assert.ok(tour.places.find((place) => place.name === name).hours.includes('לא אומתו'));
+  }
+  assert.ok(!JSON.stringify(tour).includes('MaxFun'), 'Do not recommend the permanently closed AFI venue');
+});
+
+test('extra shops stay optional and do not add taxi detours or a packed flight day', () => {
+  const optionalNames = new Set(['Romanian Boutique', 'LEGO Certified Store ParkLake',
+    'ProfiArt AFI Cotroceni', 'TRICKSHOT AFI Cotroceni']);
+  const scheduled = bucharest.days.flatMap((day) => day.items);
+  const extraStops = scheduled.filter((item) => optionalNames.has(item.place));
+  assert.equal(extraStops.length, 2, 'Other additions belong in the alternatives, not extra scheduled stops');
+  for (const item of extraStops) {
+    assert.ok(item.title.includes('לבחירה'));
+    assert.notEqual(item.travel?.mode, 'taxi');
+  }
+  const thursday = bucharest.days.find((day) => day.date === '2027-01-28');
+  assert.ok(!thursday.items.some((item) =>
+    item.period === 'אחר הצהריים' && item.travel?.mode === 'taxi'));
+  const friday = bucharest.days.find((day) => day.date === '2027-01-29');
+  const legoIndex = friday.items.findIndex((item) => item.place === 'LEGO Certified Store ParkLake');
+  const spaIndex = friday.items.findIndex((item) => item.place === 'Therme București');
+  assert.ok(legoIndex > 1 && legoIndex < spaIndex);
+  assert.equal(friday.items[legoIndex].time, undefined);
+  const saturday = bucharest.days.find((day) => day.date === '2027-01-30');
+  const byName = new Map(bucharest.places.map((place) => [place.name, place]));
+  assert.deepEqual(saturday.items.filter((item) =>
+    byName.get(item.place)?.category === 'attractions').map((item) => item.place), ['Museum of Senses']);
+  assert.ok(saturday.items.some((item) => item.time === '15:00' && item.title.includes('למלון')));
+});
+
 test('flight day has breakfast coffee, modern activities and no spa or collections museum', () => {
   const saturday = bucharest.days.find((day) => day.date === '2027-01-30');
   const places = new Map(bucharest.places.map((place) => [place.name, place]));
