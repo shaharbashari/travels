@@ -105,7 +105,7 @@ test('place-card map links use each tour destination', () => {
   }
 });
 
-test('Friday keeps the meeting and extended shopping before Therme', () => {
+test('Friday keeps the fixed ParkLake meeting and extended shopping before the AFI evening', () => {
   const friday = bucharest.days.find((day) => day.date === '2027-01-29');
   const meeting = friday.items.find((item) => item.title === 'הגעה ל-ParkLake לפי שעת התיאום');
   assert.ok(meeting, 'The fixed ParkLake meeting must remain on Friday');
@@ -113,11 +113,23 @@ test('Friday keeps the meeting and extended shopping before Therme', () => {
   assert.equal(meeting.time, undefined, 'Do not invent a time for the privately coordinated meeting');
   assert.equal(friday.items.indexOf(meeting), 1, 'Sightseeing must not displace the morning meeting');
 
-  const spaIndex = friday.items.findIndex((item) => item.place === 'Therme București');
-  assert.ok(spaIndex > friday.items.indexOf(meeting));
-  assert.ok(friday.items.slice(2, spaIndex).some((item) =>
+  const afiIndex = friday.items.findIndex((item) => item.place === 'Museum of Senses');
+  assert.ok(afiIndex > friday.items.indexOf(meeting));
+  assert.ok(friday.items.slice(2, afiIndex).some((item) =>
     item.place === 'ParkLake Shopping Center' && item.period === 'אחר הצהריים'));
+  const dinnerIndex = friday.items.findIndex((item) => item.place === 'Pâine și Vin');
+  assert.ok(dinnerIndex > afiIndex, 'Friday evening finishes with dinner back near the center');
   assert.ok(!friday.items.some((item) => item.place === 'National Museum of Art of Romania'));
+});
+
+test('Therme is completely removed from the Bucharest itinerary, places, and rendered views', () => {
+  for (const copy of [JSON.stringify(bucharest),
+    renderHome({ tour: bucharest, status: 'upcoming' }),
+    renderInfo({ tour: bucharest }),
+    renderExplore({ tour: bucharest, route: { param: 'all' } }),
+    ...bucharest.places.map((place) => renderPlace({ tour: bucharest, place }))]) {
+    assert.ok(!/Therme|therme\.ro|תרמה|בגד ים|ציוד הרחצה|מים חמים|ספא/i.test(copy));
+  }
 });
 
 test('Primark and visitor-facing copy describe the trip, not previous revisions', () => {
@@ -170,7 +182,7 @@ test('requested venues and the hotel-first airport transfer remain intact', () =
   assert.ok(bucharest.places.some((place) => place.name === 'MINA Museum'));
 });
 
-test('new alternatives have rich, sourced place pages in the existing clusters', () => {
+test('new alternatives and non-Therme additions have rich, sourced place pages in existing clusters', () => {
   const tour = structuredClone(bucharest);
   tour.places.forEach((place) => { place.id = pid(place.name); });
   const expected = [
@@ -178,17 +190,19 @@ test('new alternatives have rich, sourced place pages in the existing clusters',
     ['LEGO Certified Store ParkLake', 'brickdepot.ro', { lat: 44.4206655, lng: 26.149631 }],
     ['ProfiArt AFI Cotroceni', 'www.aficotroceni.ro', { lat: 44.4303333, lng: 26.0522045 }],
     ['TRICKSHOT AFI Cotroceni', 'trickshot.ro', { lat: 44.4303333, lng: 26.0522045 }],
+    ['Velonova Mirage 3D Museum', 'velonova.ro', { lat: 44.4357137, lng: 26.094911 }],
+    ['Cotroceni on Ice', 'patinoarafi.ro', { lat: 44.4303333, lng: 26.0522045 }],
+    ['1UP Gamers Pub', 'www.facebook.com', { lat: 44.4449566, lng: 26.0962978 }],
+    ['Pâine și Vin', 'ialoc.ro', { lat: 44.433401, lng: 26.094825 }],
   ];
   for (const [name, sourceHost, coords] of expected) {
     const place = tour.places.find((entry) => entry.name === name);
-    assert.ok(place, `Missing new alternative: ${name}`);
+    assert.ok(place, `Missing new place: ${name}`);
     assert.deepEqual({ lat: place.lat, lng: place.lng }, coords);
     assert.ok(place.address && place.hours && place.price && place.long);
     assert.ok(place.tips.length >= 2 && place.tags.length >= 2);
     assert.equal(place.rating, undefined, `Do not invent a rating for ${name}`);
-    assert.ok(/לבחירה|חלופה/.test(place.badge));
-    assert.ok(place.links.some((link) =>
-      link.type === 'website' && new URL(link.url).hostname === sourceHost));
+    assert.ok(place.links.some((link) => new URL(link.url).hostname === sourceHost));
     const html = renderPlace({ tour, place });
     assert.ok(html.includes(place.address));
     assert.ok(html.includes('detail-mapwrap'));
@@ -199,20 +213,28 @@ test('new alternatives have rich, sourced place pages in the existing clusters',
     }
   }
   const boutique = tour.places.find((place) => place.name === 'Romanian Boutique');
-  assert.ok(haversineM(tour.hotel, boutique) < 500, 'The replacement must be in the hotel walking cluster');
+  assert.ok(haversineM(tour.hotel, boutique) < 500, 'Romanian Boutique must be in the hotel walking cluster');
   assert.ok(boutique.links.some((link) => link.url.includes('query_place_id=ChIJDzU6XD7_sUAR7mllnhXAmNA')));
-  for (const name of ['ProfiArt AFI Cotroceni', 'TRICKSHOT AFI Cotroceni']) {
+  const velonova = tour.places.find((place) => place.name === 'Velonova Mirage 3D Museum');
+  assert.ok(haversineM(tour.hotel, velonova) < 700, 'Velonova must be walkable from the hotel');
+  const paine = tour.places.find((place) => place.name === 'Pâine și Vin');
+  assert.ok(haversineM(tour.hotel, paine) < 600, 'Friday dinner should be walkable from the hotel');
+  const ototo = tour.places.find((place) => place.name === 'OTOTO Amzei');
+  const oneUp = tour.places.find((place) => place.name === '1UP Gamers Pub');
+  assert.ok(haversineM(ototo, oneUp) < 250, '1UP Gamers Pub should be in the OTOTO street cluster');
+  for (const name of ['ProfiArt AFI Cotroceni', 'TRICKSHOT AFI Cotroceni', '1UP Gamers Pub']) {
     assert.ok(tour.places.find((place) => place.name === name).hours.includes('לא אומתו'));
   }
   assert.ok(!JSON.stringify(tour).includes('MaxFun'), 'Do not recommend the permanently closed AFI venue');
+  assert.ok(!JSON.stringify(tour).includes('Kitsch Museum'), 'Do not recommend unverified closed museum');
 });
 
-test('extra shops stay optional and do not add taxi detours or a packed flight day', () => {
+test('extra venues stay optional and flight day stays relaxed near the hotel', () => {
   const optionalNames = new Set(['Romanian Boutique', 'LEGO Certified Store ParkLake',
-    'ProfiArt AFI Cotroceni', 'TRICKSHOT AFI Cotroceni']);
+    'ProfiArt AFI Cotroceni', 'TRICKSHOT AFI Cotroceni', 'Cotroceni on Ice', '1UP Gamers Pub']);
   const scheduled = bucharest.days.flatMap((day) => day.items);
   const extraStops = scheduled.filter((item) => optionalNames.has(item.place));
-  assert.equal(extraStops.length, 2, 'Other additions belong in the alternatives, not extra scheduled stops');
+  assert.equal(extraStops.length, 3, 'Keep extra scheduled options compact and explicitly optional');
   for (const item of extraStops) {
     assert.ok(item.title.includes('לבחירה'));
     assert.notEqual(item.travel?.mode, 'taxi');
@@ -222,13 +244,13 @@ test('extra shops stay optional and do not add taxi detours or a packed flight d
     item.period === 'אחר הצהריים' && item.travel?.mode === 'taxi'));
   const friday = bucharest.days.find((day) => day.date === '2027-01-29');
   const legoIndex = friday.items.findIndex((item) => item.place === 'LEGO Certified Store ParkLake');
-  const spaIndex = friday.items.findIndex((item) => item.place === 'Therme București');
-  assert.ok(legoIndex > 1 && legoIndex < spaIndex);
+  const afiIndex = friday.items.findIndex((item) => item.place === 'Museum of Senses');
+  assert.ok(legoIndex > 1 && legoIndex < afiIndex);
   assert.equal(friday.items[legoIndex].time, undefined);
   const saturday = bucharest.days.find((day) => day.date === '2027-01-30');
   const byName = new Map(bucharest.places.map((place) => [place.name, place]));
   assert.deepEqual(saturday.items.filter((item) =>
-    byName.get(item.place)?.category === 'attractions').map((item) => item.place), ['Museum of Senses']);
+    byName.get(item.place)?.category === 'attractions').map((item) => item.place), ['Velonova Mirage 3D Museum']);
   assert.ok(saturday.items.some((item) => item.time === '15:00' && item.title.includes('למלון')));
 });
 
