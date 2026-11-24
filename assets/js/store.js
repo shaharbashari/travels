@@ -87,19 +87,29 @@ function assignIds(tour) {
 
 function clone(o) { return typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)); }
 
-function applyLayer(byId, layer) {
-  for (const [id, doc] of Object.entries(layer || {})) {
-    if (doc && doc._deleted) byId.delete(id);
-    else if (doc) byId.set(id, clone(doc));
+export function mergeTourLayers(seeds, cloud = {}, local = {}) {
+  const byId = new Map();
+  const seedVer = new Map();
+  for (const t of seeds || []) {
+    byId.set(t.id, clone(t));
+    seedVer.set(t.id, Number(t.seedVersion) || 0);
   }
+  const apply = (layer) => {
+    for (const [id, doc] of Object.entries(layer || {})) {
+      if (!doc) continue;
+      if (doc._deleted) { byId.delete(id); continue; }
+      const minVer = seedVer.get(id) || 0;
+      if (minVer > 0 && (Number(doc.seedVersion) || 0) < minVer) continue;
+      byId.set(id, clone(doc));
+    }
+  };
+  apply(cloud);   // הענן גובר על ה-seed (אלא אם ה-seed עודכן לגרסה חדשה יותר)
+  apply(local);   // ועריכה מקומית גוברת על הכול
+  return [...byId.values()].map(assignIds).sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
 }
 
 function computeEffective() {
-  const byId = new Map();
-  for (const t of seedTours) byId.set(t.id, clone(t));
-  applyLayer(byId, cloudTours);   // הענן גובר על ה-seed
-  applyLayer(byId, localTours);   // ועריכה מקומית גוברת על הכול
-  effective = [...byId.values()].map(assignIds).sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+  effective = mergeTourLayers(seedTours, cloudTours, localTours);
 }
 
 // ---- קריאה --------------------------------------------------------------
@@ -172,6 +182,10 @@ export async function loadAll() {
 // ---- כתיבה (CRUD) -------------------------------------------------------
 export async function saveTour(tour) {
   tour = assignIds(clone(tour));
+  const seed = seedTours.find((t) => t.id === tour.id);
+  if (seed?.seedVersion && (Number(tour.seedVersion) || 0) < seed.seedVersion) {
+    tour.seedVersion = seed.seedVersion;
+  }
   if (isCloud()) {
     try {
       await withTimeout(_fs.setDoc(_fs.doc(_db, 'tours', tour.id), sanitize(tour)));

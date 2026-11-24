@@ -7,6 +7,7 @@ const P = {
 
 const bucharest2027 = {
   id: 'bucharest-2027',
+  seedVersion: 2,
   order: 2,
   destination: { city: 'בוקרשט', country: 'רומניה', flag: '🇷🇴', lat: 44.43315, lng: 26.10063 },
   airport: { name: 'Henri Coandă / Otopeni (OTP)', lat: 44.5711, lng: 26.085 },

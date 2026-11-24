@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import tours from '../data/tours/index.js';
 import { pid, CATEGORIES } from '../assets/js/util.js';
 import { haversineM, legFor } from '../assets/js/travel.js';
+import { mergeTourLayers } from '../assets/js/store.js';
 import { render as renderInfo } from '../assets/js/views/info.js';
 import { render as renderHome } from '../assets/js/views/home.js';
 import { render as renderTrips } from '../assets/js/views/trips.js';
@@ -290,4 +291,16 @@ test('specialty shopping and walkable cocktails replace the old museum-heavy rou
     assert.ok(!scheduled.some((item) => item.place === name));
     assert.ok(!places.has(name));
   }
+});
+
+test('newer seedVersion supersedes stale cloud/local snapshots while preserving same-version edits', () => {
+  const seed = { id: 'bucharest-2027', seedVersion: 2, title: 'חדש', order: 2, days: [], places: [] };
+  const staleCloud = { 'bucharest-2027': { id: 'bucharest-2027', title: 'ישן', order: 2, days: [], places: [] } };
+  const freshCloud = { 'bucharest-2027': { id: 'bucharest-2027', seedVersion: 2, title: 'ערוך בענן', order: 2, days: [], places: [] } };
+  const unversionedSeed = { id: 'budapest-2026', title: 'seed', order: 1, days: [], places: [] };
+  const budapestCloud = { 'budapest-2026': { id: 'budapest-2026', title: 'ענן', order: 1, days: [], places: [] } };
+
+  assert.equal(mergeTourLayers([seed], staleCloud)[0].title, 'חדש');
+  assert.equal(mergeTourLayers([seed], freshCloud)[0].title, 'ערוך בענן');
+  assert.equal(mergeTourLayers([unversionedSeed], budapestCloud)[0].title, 'ענן');
 });
